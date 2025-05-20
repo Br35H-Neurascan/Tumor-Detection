@@ -1,1 +1,0 @@
-                if (result.imageId && result.userId === user.uid) {
