@@ -1,0 +1,12 @@
+flask==2.0.1
+flask-cors==3.0.10
+werkzeug==2.0.2
+torch>=2.0.0
+torchvision>=0.15.0
+opencv-python>=4.0.0
+numpy>=1.24.0
+pillow>=9.0.0
+firebase-admin>=6.0.0
+google-cloud-storage>=2.0.0
+google-cloud-firestore>=2.0.0
+requests>=2.25.0 
