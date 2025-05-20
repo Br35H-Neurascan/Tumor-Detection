@@ -66,15 +66,36 @@ A web application for detecting tumors in brain MRI scans using Mask R-CNN deep 
 - `GET /api/sample-images/<sample_id>`: Get a sample image (not fully implemented)
 
 ## File Structure
-
-- `index.html`: Main web interface
-- `script.js`: Frontend JavaScript logic
-- `styles.css`: CSS styling
-- `auth.js`: User authentication logic
-- `firebase-config.js`: Firebase configuration
-- `python/app.py`: Flask API server
-- `python/test_maskrcnn.py`: MaskRCNN model interface
-- `model/`: Directory for ML model files
+<pre>Tumor-Detection/
+├── backend/                            # All backend Python logic
+│   ├── app.py                          # Main Flask application
+│   ├── firebase/
+│   │   └── service.py                  # Firebase backend integration
+│   ├── model/
+│   │   ├── .gitattributes              # Git LFS tracking file
+│   │   ├── maskrcnn_tumor.pth          # Trained Mask R-CNN model file
+│   │   └── train.py                    # Model training script
+│   └── scripts/
+│       ├── test_maskrcnn.py           # Test script for Mask R-CNN
+│       ├── test_tumor_detection.py    # Full pipeline test script
+│       └── upload_samples_to_firebase.py  # Uploads images to Firebase
+│
+├── credentials/                          # Firebase credentials and setup
+│   └── service-account-instructions.txt  # Setup instructions
+│
+├── frontend/                           # Web interface (HTML/CSS/JS)
+│   ├── index.html                      # Main webpage structure
+│   ├── styles.css                      # Web styling
+│   ├── script.js                       # Frontend logic (upload, API calls)
+│   ├── resources.js                    # Helper data/functions
+│   ├── firebase/
+│   │   ├── auth.js                     # Handles user authentication
+│   │   ├── firebase-config.js          # Firebase frontend config
+│   │   └── firebase-messaging-sw.js    # Service worker for push notifications
+│   └── backups/
+│       ├── script.js.backup            # Backup of old JS version
+│       └── script.js.bak               # Another backup
+└──|</pre>
 
 ## Troubleshooting
 
