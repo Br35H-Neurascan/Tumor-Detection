@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeuraScan - Brain Tumor Detection</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="styles.css">
+    <!-- Firebase SDK Initialization (placed in head for early initialization) -->
+    <script defer src="https://www.gstatic.com/firebasejs/9.19.1/firebase-app-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/9.19.1/firebase-auth-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/9.19.1/firebase-firestore-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/9.19.1/firebase-storage-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/9.19.1/firebase-analytics-compat.js"></script>
+    <script defer src="https://www.gstatic.com/firebasejs/9.19.1/firebase-messaging-compat.js"></script>
+    <!-- PDF Generation Library -->
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Your configuration script -->
+    <script defer src="firebase-config.js"></script>
+    <script defer src="resources.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <nav>
+                <div class="logo">
+                    <i class="fas fa-brain"></i>
+                    <span>NeuraScan</span>
+                </div>
+                <ul class="nav-links">
+                    <li><a href="#home" class="active">Home</a></li>
+                    <li><a href="#detector">Detector</a></li>
+                    <li><a href="#how-it-works">How It Works</a></li>
+                    <li><a href="#about">About</a></li>
+                    <li><a href="#technology">Technology</a></li>
+                    <li><a href="#contact">Contact</a></li>
+                </ul>
+                <!-- Auth Button/Profile -->
+                <div class="auth-nav">
+                    <button id="login-nav-button" class="btn btn-outline">Login</button>
+                    <div class="user-profile" id="user-profile" style="display: none;">
+                        <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48Y2lyY2xlIGN4PSIyNTYiIGN5PSIyNTYiIHI9IjI1NiIgZmlsbD0iI2YwZjBmMCIvPjxwYXRoIGZpbGw9IiM2Yzc1N2QiIGQ9Ik0yNTYgMzA0Yy02MS44IDAtMTEyLTUwLjItMTEyLTExMlMxOTQuMiA4MCAyNTYgODBzMTEyIDUwLjIgMTEyIDExMi01MC4yIDExMi0xMTIgMTEyem0wIDQ4YzExMiAwIDIxNiA2MC4yIDIxNiAxNjh2MzJIMzJ2LTMyYzAtOTYgODgtMTY4IDIyNC0xNjh6Ii8+PC9zdmc+" alt="Profile" id="user-avatar" class="user-avatar">
+                        <span id="user-name">User</span>
+                        <div class="user-dropdown">
+                            <a href="#" id="view-history">View Scan History</a>
+                            <a href="#" id="account-settings">Account Settings</a>
+                            <a href="#" id="logout-button">Logout</a>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+        </div>
+    </header>
+
+
+    <!-- Auth Container -->
+    <div class="auth-container" id="auth-container">
+        <div class="auth-overlay" id="auth-overlay">
+            <div class="auth-modal">
+                 <!-- <span class="auth-close" id="auth-close">&times;</span> -->
+                 <button class="auth-close-btn" id="auth-close"><i class="fas fa-times"></i></button>
+                <div class="auth-tabs">
+                    <div class="auth-tab active" id="login-tab">Login</div>
+                    <div class="auth-tab" id="signup-tab">Sign Up</div>
+                </div>
+                <div class="auth-content">
+                    <!-- Login Form -->
+                    <div class="auth-form" id="login-form">
+                        <div class="form-group">
+                            <label for="login-email">Email</label>
+                            <input type="email" id="login-email" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="login-password">Password</label>
+                            <input type="password" id="login-password" class="form-control" required>
+                        </div>
+                        <button id="login-button" class="btn">Login</button>
+                        <p class="auth-message" id="login-message"></p>
+                        <div class="auth-options">
+                            <p style="text-align: center; margin-bottom: 15px;">Or sign in with</p>
+                            <div class="auth-social-providers">
+                                <div class="auth-social-row">
+                                    <button id="google-login" class="auth-provider-btn google" title="Sign in with Google">
+                                        <i class="fab fa-google"></i>
+                                    </button>
+                                    <span class="auth-social-text">Google</span>
+                                </div>
+                            </div>
+                            <p class="forgot-password" id="forgot-password">Forgot Password?</p>
+                        </div>
+                    </div>
+
+                    <!-- Sign Up Form -->
+                    <div class="auth-form" id="signup-form" style="display: none;">
+                        <div class="form-group">
+                            <label for="signup-name">Full Name</label>
+                            <input type="text" id="signup-name" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="signup-email">Email</label>
+                            <input type="email" id="signup-email" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="signup-password">Password</label>
+                            <input type="password" id="signup-password" class="form-control" required>
+                        </div>
+                        <button id="signup-button" class="btn">Sign Up</button>
+                        <p class="auth-message" id="signup-message"></p>
+                        <div class="auth-options">
+                            <p style="text-align: center; margin-bottom: 15px;">Or sign up with</p>
+                            <div class="auth-social-providers">
+                                <div class="auth-social-row">
+                                    <button class="auth-provider-btn google" id="google-signup" title="Sign up with Google">
+                                        <i class="fab fa-google"></i>
+                                    </button>
+                                    <span class="auth-social-text">Google</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Password Reset Form -->
+                    <div class="auth-form" id="reset-form" style="display: none;">
+                        <div class="form-group">
+                            <label for="reset-email">Enter your email</label>
+                            <input type="email" id="reset-email" class="form-control" required>
+                        </div>
+                        <button id="reset-button" class="btn">Reset Password</button>
+                        <p class="auth-message" id="reset-message"></p>
+                        <button id="back-to-login" class="btn-link">Back to Login</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hero Section -->
+    <section class="hero" id="home">
+        <div class="hero-content">
+            <h1>Advanced Brain Tumor Detection</h1>
+            <p>Our AI-powered solution provides accurate and efficient detection of brain tumors from MRI scans using state-of-the-art deep learning algorithms.</p>
+            <a href="#detector" class="btn">Try It Now</a>
+            <a href="#how-it-works" class="btn btn-outline">Learn More</a>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features">
+        <div class="container">
+            <div class="section-title">
+                <h2>Key Features</h2>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <h3>AI-Powered Analysis</h3>
+                    <p>Our deep learning model has been trained on thousands of MRI scans to provide accurate tumor detection and classification.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-tachometer-alt"></i>
+                    </div>
+                    <h3>Real-Time Results</h3>
+                    <p>Get instant analysis of brain scans with our high-performance cloud-based system, reducing wait times for critical diagnoses.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h3>Detailed Analytics</h3>
+                    <p>Receive comprehensive analytics including tumor location, size, and confidence scores to support informed medical decisions.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Detection Tool Section -->
+    <section class="detection-tool" id="detector">
+        <div class="container">
+            <div class="section-title">
+                <h2>Brain Tumor Detector</h2>
+            </div>
+            <div class="detection-container">
+                <div class="upload-section">
+                    <h3 class="upload-title">Upload MRI Scan</h3>
+                    <p class="upload-description">Upload a brain MRI scan image (JPEG or PNG format) to detect potential tumors.</p>
+                    <div class="upload-area" id="upload-area">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>Drag and drop your image here or <span>click to browse</span></p>
+                        <input type="file" id="file-input" class="file-input" accept="image/*">
+                    </div>
+                    <div class="or-text">OR</div>
+                    <p style="text-align: center; margin-bottom: 10px;">Try with sample images:</p>
+                    <div class="sample-images">
+                        <img src="/api/placeholder/80/80" alt="Sample 1" class="sample-image" data-sample="1" />
+                        <img src="/api/placeholder/80/80" alt="Sample 2" class="sample-image" data-sample="2" />
+                        <img src="/api/placeholder/80/80" alt="Sample 3" class="sample-image" data-sample="3" />
+                    </div>
+                    <button class="btn btn-process" id="process-btn">Process Scan</button>
+                </div>
+                <div id="results-section" class="results-section" style="display: none;">
+                    <div class="results-title">
+                        <h3>Analysis Results</h3>
+                    </div>
+                    <div class="results-container">
+                        <div id="result-image-container" class="result-image-container">
+                            <img id="result-image" class="result-image" src="" alt="Processed MRI Scan">
+                            <div class="result-overlay"></div>
+                        </div>
+                        <div class="result-details">
+                            <div class="result-data-item result-status">
+                                <h4><i class="fas fa-clipboard-check"></i> Analysis Status</h4>
+                                <div id="result-badge" class="result-badge">Analyzing...</div>
+                            </div>
+                            
+                            <!-- Add confidence section with improved UI -->
+                            <div class="result-data-item confidence-container">
+                                <h4>Confidence Level</h4>
+                                <div class="confidence-display">
+                                    <div class="confidence-meter">
+                                        <div class="confidence-bar" id="confidence-bar"></div>
+                                    </div>
+                                    <div class="confidence-value" id="confidence-value">-</div>
+                                </div>
+                            </div>
+                            
+                            <!-- Hidden elements to maintain compatibility with existing code -->
+                            <div style="display:none">
+                                <p id="confidence-score">0%</p>
+                                <p id="tumor-probability"></p>
+                                <p id="tumor-type"></p>
+                                <p id="tumor-size"></p>
+                                <p id="tumor-location"></p>
+                            </div>
+                        </div>
+                        <div class="buttons-container">
+                            <button class="btn btn-outline-dark" id="new-scan-btn"><i class="fas fa-redo"></i> New Scan</button>
+                            <button class="btn btn-secondary" id="download-btn"><i class="fas fa-download"></i> Download Report</button>
+                            <button class="btn" id="save-result-btn"><i class="fas fa-save"></i> Save Result</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- How It Works Section -->
+    <section class="how-it-works" id="how-it-works">
+        <div class="container">
+            <div class="section-title">
+                <h2>How It Works</h2>
+            </div>
+            <div class="steps-container">
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <div class="step-icon"><i class="fas fa-upload"></i></div>
+                    <h3>Upload MRI Scan</h3>
+                    <p>Upload a brain MRI scan image in JPEG or PNG format through our secure interface.</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <div class="step-icon"><i class="fas fa-cogs"></i></div>
+                    <h3>AI Processing</h3>
+                    <p>Our advanced neural network analyzes the scan using deep learning algorithms trained on thousands of samples.</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <div class="step-icon"><i class="fas fa-search"></i></div>
+                    <h3>Tumor Detection</h3>
+                    <p>The system identifies potential tumor regions and classifies them based on various characteristics.</p>
+                </div>
+                <div class="step-card">
+                    <div class="step-number">4</div>
+                    <div class="step-icon"><i class="fas fa-file-medical-alt"></i></div>
+                    <h3>Results & Report</h3>
+                    <p>Receive instant analysis with detailed results and downloadable reports for healthcare professionals.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Section -->
+    <section class="about" id="about">
+        <div class="container">
+            <div class="section-title">
+                <h2>About NeuraScan</h2>
+            </div>
+            <div class="about-container">
+                <div class="about-content">
+                    <div class="about-layout">
+                        <!-- Metrics now above paragraphs -->
+                        <div class="about-metrics-container">
+                            <div class="metric-item animated-stat">
+                                <i class="fas fa-chart-bar metric-icon"></i>
+                                <div class="metric-value">96%</div>
+                                <div class="metric-label">Detection Accuracy</div>
+                            </div>
+                            <div class="metric-item animated-stat">
+                                <i class="fas fa-brain metric-icon"></i>
+                                <div class="metric-value">Above 5,000</div>
+                                <div class="metric-label">Training Images</div>
+                            </div>
+                            <div class="metric-item animated-stat">
+                                <i class="fas fa-bolt metric-icon"></i>
+                                <div class="metric-value">3s</div>
+                                <div class="metric-label">Processing Time</div>
+                            </div>
+                        </div>
+                        
+                        <!-- Text paragraphs below metrics -->
+                        <div class="about-text-container">
+                            <div class="about-text-box animated-stat">
+                                <p>NeuraScan is a cutting-edge brain tumor detection system developed by a team of AI researchers, medical professionals, and computer science experts dedicated to revolutionizing medical diagnostics through artificial intelligence.</p>
+                            </div>
+                            <div class="about-text-box animated-stat">
+                                <p>Our mission is to make advanced diagnostic tools accessible to healthcare providers worldwide, significantly reducing the time and cost of brain tumor detection while improving accuracy and patient outcomes.</p>
+                            </div>
+                            <div class="about-text-box animated-stat">
+                                <p>The system employs a state-of-the-art convolutional neural network trained on Above 5,000 MRI scans, achieving remarkable accuracy in detecting various types of brain tumors.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Technology Section -->
+    <section class="technology" id="technology">
+        <div class="container">
+            <div class="section-title">
+                <h2>Advanced AI Technology</h2>
+            </div>
+            <div class="tech-container">
+                <!-- AI Model Card -->
+                <div class="feature-card tech-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-brain"></i>
+                    </div>
+                    <h3>Deep Neural Network</h3>
+                    <p>Our solution utilizes a specialized convolutional neural network (CNN) with advanced image segmentation capabilities optimized for medical imaging.</p>
+                    <ul class="tech-list">
+                        <li>Transfer learning from ResNet architecture</li>
+                        <li>Fine-tuned on Above 5,000 MRI scans</li>
+                        <li>Multi-stage detection pipeline</li>
+                        <li>Region-aware feature extraction</li>
+                    </ul>
+                </div>
+
+                <!-- Technical Specs Card -->
+                <div class="feature-card tech-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-microchip"></i>
+                    </div>
+                    <h3>Technical Specifications</h3>
+                    <p>Our cloud-based infrastructure ensures rapid processing and reliable performance for medical professionals.</p>
+                    <ul class="tech-list">
+                        <li>Google Cloud AI Platform deployment</li>
+                        <li>Auto-scaling for handling peak workloads</li>
+                        <li>HIPAA-compliant data encryption</li>
+                        <li>High-availability architecture (99.9% uptime)</li>
+                    </ul>
+                </div>
+
+                <!-- Performance Card -->
+                <div class="feature-card tech-card">
+                    <div class="feature-icon">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                    <h3>Performance Metrics</h3>
+                    <p>Clinically validated through extensive testing and evaluation against gold-standard diagnoses.</p>
+                    <ul class="tech-list">
+                        <li>96.4% detection accuracy</li>
+                        <li>93.7% tumor type classification accuracy</li>
+                        <li>0.92 area under ROC curve (AUC)</li>
+                        <li>Average processing time: 3.2 seconds</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Implementation Diagram -->
+            <div class="implementation-container">
+                <h3 class="implementation-title">Implementation Architecture</h3>
+                <div class="implementation-content">
+                    <!-- Architecture Steps -->
+                    <div class="architecture-steps">
+                        <div class="animated-step">
+                            <div class="arch-step">
+                                <div class="step-number">1</div>
+                                <h4>Image Preprocessing</h4>
+                                <p>Normalization, noise reduction, and enhancement</p>
+                            </div>
+                        </div>
+                        <div class="animated-step">
+                            <div class="arch-step">
+                                <div class="step-number">2</div>
+                                <h4>Region Segmentation</h4>
+                                <p>Identifying regions of interest in brain tissue</p>
+                            </div>
+                        </div>
+                        <div class="animated-step">
+                            <div class="arch-step">
+                                <div class="step-number">3</div>
+                                <h4>Feature Extraction</h4>
+                                <p>Deep CNN processes image features</p>
+                            </div>
+                        </div>
+                        <div class="animated-step">
+                            <div class="arch-step">
+                                <div class="step-number">4</div>
+                                <h4>Classification & Analysis</h4>
+                                <p>Tumor detection, classification, and result generation</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section class="contact" id="contact">
+        <div class="container">
+            <div class="section-title">
+                <h2>Contact Us</h2>
+            </div>
+            <div class="contact-container">
+                <div class="contact-info">
+                    <div class="contact-card">
+                        <div class="contact-icon">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </div>
+                        <div class="contact-text">
+                            <h3>Address</h3>
+                            <p>Abbasağa, Ihlamur Yıldız Cd. No:8, 34353 Beşiktaş/İstanbul</p>
+                        </div>
+                    </div>
+                    <div class="contact-card">
+                        <div class="contact-icon">
+                            <i class="fas fa-phone-alt"></i>
+                        </div>
+                        <div class="contact-text">
+                            <h3>Phone</h3>
+                            <p>(0212) 381 00 00</p>
+                        </div>
+                    </div>
+                    <div class="contact-card">
+                        <div class="contact-icon">
+                            <i class="fas fa-envelope"></i>
+                        </div>
+                        <div class="contact-text">
+                            <h3>Email</h3>
+                            <p>info@neurascan.com</p>
+                        </div>
+                    </div>
+                    <div class="contact-card">
+                        <div class="contact-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="contact-text">
+                            <h3>Support Hours</h3>
+                            <p>Monday - Friday: 9am - 5pm (EST)</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="contact-form">
+                    <form id="contact-form">
+                        <div class="form-group">
+                            <label for="name">Full Name</label>
+                            <input type="text" id="name" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="email">Email Address</label>
+                            <input type="email" id="email" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="subject">Subject</label>
+                            <input type="text" id="subject" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="message">Message</label>
+                            <textarea id="message" class="form-control" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-process">Send Message</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Resources Section -->
+    <!-- Resources section and related markup removed as requested. -->
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-container">
+                <div class="footer-col">
+                    <h3>NeuraScan</h3>
+                    <p>Advanced AI-powered brain tumor detection technology for medical professionals and healthcare facilities worldwide.</p>
+                    <div class="social-links">
+                        <a href="https://www.facebook.com/bahcesehiruniversity" target="_blank" rel="noopener"><i class="fab fa-facebook-f"></i></a>
+                        <a href="https://x.com/Bahcesehir" target="_blank" rel="noopener"><i class="fab fa-twitter"></i></a>
+                        <a href="https://www.linkedin.com/school/bahcesehir-university/" target="_blank" rel="noopener"><i class="fab fa-linkedin-in"></i></a>
+                        <a href="https://www.instagram.com/bahcesehiruniversity/" target="_blank" rel="noopener"><i class="fab fa-instagram"></i></a>
+                    </div>
+                </div>
+                <div class="footer-col">
+                    <h3>Quick Links</h3>
+                    <ul class="footer-links">
+                        <li><a href="#home">Home</a></li>
+                        <li><a href="#detector">Detector</a></li>
+                        <li><a href="#how-it-works">How It Works</a></li>
+                        <li><a href="#about">About Us</a></li>
+                        <li><a href="#technology">Technology</a></li>
+                        <li><a href="#contact">Contact</a></li>
+                    </ul>
+                </div>
+                <div class="footer-col">
+                    <h3>Newsletter</h3>
+                    <p>Subscribe to our newsletter for the latest updates and advancements in medical AI.</p>
+                    <form id="newsletter-form">
+                        <div class="form-group">
+                            <input type="email" class="form-control" placeholder="Your Email" required>
+                        </div>
+                        <button type="submit" class="btn">Subscribe</button>
+                    </form>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 NeuraScan. All Rights Reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Loading Animation -->
+    <div class="loading-container" id="loading-container">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <h3 class="loading-text">Analyzing Your Scan</h3>
+            <p class="loading-subtext">This may take a few seconds...</p>
+        </div>
+    </div>
+
+    <!-- FAQ Modal -->
+    <div class="modal" id="faq-modal">
+        <div class="modal-content">
+            <span class="close-modal" id="close-faq">&times;</span>
+            <h2 class="modal-title">Frequently Asked Questions</h2>
+            <div class="modal-body">
+                <p><strong>Q: How accurate is the NeuraScan brain tumor detection?</strong></p>
+                <p>Our system has achieved 96% accuracy in clinical tests, comparable to expert radiologists. However, it's designed as a diagnostic aid and not a replacement for professional medical advice.</p>
+
+                <p><strong>Q: What types of brain tumors can the system detect?</strong></p>
+                <p>NeuraScan can detect and classify several common types of brain tumors, including meningiomas, gliomas, pituitary tumors, and metastatic tumors.</p>
+
+                <p><strong>Q: What image formats are supported?</strong></p>
+                <p>We support standard medical imaging formats as well as common formats like JPEG and PNG.</p>
+
+                <p><strong>Q: Is my medical data secure?</strong></p>
+                <p>Yes, all data is encrypted using industry-standard protocols. We comply with HIPAA regulations and never store your images without explicit consent.</p>
+
+                <p><strong>Q: Can I integrate this with our hospital's existing systems?</strong></p>
+                <p>Yes, NeuraScan offers API integration options for healthcare facilities to incorporate our detection capabilities into their existing workflows.</p>
+
+                <p><strong>Q: How long does it take to process an image?</strong></p>
+                <p>Most scans are processed within 3-5 seconds, depending on image size and complexity.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating Button -->
+    <div class="btn-floating" id="scroll-top-btn">
+        <i class="fas fa-arrow-up"></i>
+    </div>
+    
+    <!-- User Profile Modal -->
+    <div id="profileModal" class="modal">
+        <div class="modal-content profile-modal-content">
+            <span class="close">&times;</span>
+            <div class="profile-header">
+                <div class="profile-avatar">
+                    <img id="profileAvatar" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48Y2lyY2xlIGN4PSIyNTYiIGN5PSIyNTYiIHI9IjI1NiIgZmlsbD0iI2YwZjBmMCIvPjxwYXRoIGZpbGw9IiM2Yzc1N2QiIGQ9Ik0yNTYgMzA0Yy02MS44IDAtMTEyLTUwLjItMTEyLTExMlMxOTQuMiA4MCAyNTYgODBzMTEyIDUwLjIgMTEyIDExMi01MC4yIDExMi0xMTIgMTEyem0wIDQ4YzExMiAwIDIxNiA2MC4yIDIxNiAxNjh2MzJIMzJ2LTMyYzAtOTYgODgtMTY4IDIyNC0xNjh6Ii8+PC9zdmc+" alt="Profile Avatar">
+                </div>
+                <div class="profile-info">
+                    <h3 id="profileName">User Name</h3>
+                    <p id="profileEmail">user@example.com</p>
+                </div>
+            </div>
+
+            <div class="profile-tabs">
+                <div class="profile-tab active" data-tab="samples">Sample Images</div>
+                <div class="profile-tab" data-tab="history">Analysis History</div>
+                <div class="profile-tab" data-tab="settings">Settings</div>
+            </div>
+
+            <!-- User samples tab -->
+            <div id="samplesTab" class="profile-tab-content active">
+                <div class="profile-section-title">
+                    <h3>My Sample Images</h3>
+                    <button id="addSampleBtn" class="button-primary">
+                        <i class="fas fa-plus"></i> Add Sample
+                    </button>
+                </div>
+                <p class="profile-description">These images can be used as reference when performing new analyses.</p>
+                
+                <div id="userSamplesGrid" class="profile-samples-grid">
+                    <!-- Sample images will be populated here dynamically -->
+                    <div class="profile-empty-state" id="emptyUserSamples">
+                        <i class="fas fa-images"></i>
+                        <p>You don't have any sample images yet.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="historyTab" class="profile-tab-content">
+                <div class="profile-section-title">
+                    <h3>Analysis History</h3>
+                </div>
+                <p class="profile-description">Recent analyses you've performed.</p>
+                
+                <div id="userHistoryList" class="profile-history-list">
+                    <!-- History items will be populated here dynamically -->
+                    <div class="profile-empty-state" id="emptyUserHistory">
+                        <i class="fas fa-history"></i>
+                        <p>No analysis history available.</p>
+                        <button class="button-primary" id="newAnalysisFromHistoryBtn">
+                            <i class="fas fa-microscope"></i> Perform Your First Analysis
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="settingsTab" class="profile-tab-content">
+                <div class="profile-section-title">
+                    <h3>Account Settings</h3>
+                </div>
+                
+                <div class="settings-sections">
+                    <!-- Profile Information Section -->
+                    <div class="settings-section">
+                        <div class="settings-section-header">
+                            <h4><i class="fas fa-user"></i> Profile Information</h4>
+                            <p>Manage your personal information</p>
+                </div>
+                
+                <form id="profileSettingsForm">
+                            <div class="profile-settings-layout">
+                                <div class="profile-avatar-section">
+                                    <div class="avatar-preview">
+                                        <img id="avatarPreview" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48Y2lyY2xlIGN4PSIyNTYiIGN5PSIyNTYiIHI9IjI1NiIgZmlsbD0iI2YwZjBmMCIvPjxwYXRoIGZpbGw9IiM2Yzc1N2QiIGQ9Ik0yNTYgMzA0Yy02MS44IDAtMTEyLTUwLjItMTEyLTExMlMxOTQuMiA4MCAyNTYgODBzMTEyIDUwLjIgMTEyIDExMi01MC4yIDExMi0xMTIgMTEyem0wIDQ4YzExMiAwIDIxNiA2MC4yIDIxNiAxNjh2MzJIMzJ2LTMyYzAtOTYgODgtMTY4IDIyNC0xNjh6Ii8+PC9zdmc+" alt="Avatar Preview">
+                                    </div>
+                                    <div class="file-input-wrapper">
+                                        <button class="button-secondary file-input-button">Choose Photo</button>
+                                        <span id="avatarFileName">No file chosen</span>
+                                        <input type="file" id="settingsAvatar" accept="image/*">
+                                    </div>
+                                    <div class="member-info">
+                                        <p><i class="fas fa-calendar-alt"></i> Member since <span id="memberSinceDate">Loading...</span></p>
+                                    </div>
+                                </div>
+                                
+                                <div class="profile-details-section">
+                    <div class="form-group">
+                        <label for="settingsName">Display Name</label>
+                                        <input type="text" id="settingsName" class="form-control" placeholder="Your display name">
+                    </div>
+                    <div class="form-group">
+                        <label for="settingsBio">Bio</label>
+                                        <textarea id="settingsBio" class="form-control" rows="3" placeholder="Tell us about yourself"></textarea>
+                                    </div>
+                                    <div class="form-actions">
+                                        <button type="submit" id="saveProfileBtn" class="button-primary save-profile-btn">
+                                            <i class="fas fa-save"></i> Save Profile
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    
+                    <!-- Security Section -->
+                    <div class="settings-section">
+                        <div class="settings-section-header">
+                            <h4><i class="fas fa-shield-alt"></i> Security</h4>
+                            <p>Manage your account security</p>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Email Address</label>
+                            <div class="info-field">
+                                <span id="userEmailDisplay">user@example.com</span>
+                                <span class="badge badge-verified" id="emailVerifiedBadge"><i class="fas fa-check"></i> Verified</span>
+                            </div>
+                        </div>
+                        
+                    <div class="form-group">
+                            <label>Password</label>
+                            <p class="settings-note">For security reasons, we don't display your password. You can reset it anytime.</p>
+                            <button id="changePasswordBtn" class="button-secondary">
+                                <i class="fas fa-key"></i> Change Password
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Account Actions Section -->
+                    <div class="settings-section account-actions-section">
+                        <div class="settings-section-header">
+                            <h4><i class="fas fa-user-cog"></i> Account Actions</h4>
+                            <p>Manage your account</p>
+                </div>
+                        
+                        <div class="account-actions-grid">
+                            <button id="exportDataBtn" class="account-btn export-btn">
+                                <i class="fas fa-file-export"></i> Export My Data
+                    </button>
+                            
+                            <button id="logoutBtn" class="account-btn logout-btn">
+                        <i class="fas fa-sign-out-alt"></i> Logout
+                    </button>
+                            
+                            <button id="deleteAccountBtn" class="account-btn delete-btn">
+                                <i class="fas fa-trash-alt"></i> Delete Account
+                            </button>
+                        </div>
+                        <p class="settings-note danger-note">Account deletion cannot be undone. All your data will be permanently deleted.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sample Image Upload Modal -->
+    <div id="sampleImageModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Upload Sample Image</h2>
+            <div class="form-group">
+                <label for="sampleImageTitle">Title</label>
+                <input type="text" id="sampleImageTitle" class="form-control" placeholder="Enter a title for this sample">
+            </div>
+            <div class="form-group">
+                <label for="sampleImageType">Type</label>
+                <select id="sampleImageType" class="form-control">
+                    <option value="normal">Normal Tissue</option>
+                    <option value="tumor">Tumor Tissue</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="sampleImageFile">Image File</label>
+                <div class="file-input-wrapper">
+                    <button class="button-secondary file-input-button">Choose File</button>
+                    <span id="sampleFileName">No file chosen</span>
+                    <input type="file" id="sampleImageFile" accept="image/*">
+                </div>
+            </div>
+            <div class="form-group">
+                <label for="sampleImageNotes">Notes (optional)</label>
+                <textarea id="sampleImageNotes" class="form-control" rows="3" placeholder="Add any notes about this sample"></textarea>
+            </div>
+            <div id="sampleImagePreview" class="image-preview">
+                <img id="samplePreviewImg" src="" alt="Sample Preview" style="display: none;">
+                <div id="samplePreviewPlaceholder" class="preview-placeholder">
+                    <i class="fas fa-image"></i>
+                    <p>Image preview will appear here</p>
+                </div>
+            </div>
+            <div class="form-actions">
+                <button id="uploadSampleBtn" class="button-primary">Upload Sample</button>
+                <button class="button-secondary modal-cancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Account Created Success Modal -->
+    <div class="modal" id="account-created-modal">
+        <div class="modal-content">
+            <span class="close-modal" id="close-account-created">&times;</span>
+            <div class="account-success-container">
+                <div class="account-success-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h2 class="account-success-title">Account Created Successfully!</h2>
+                <p class="account-success-message">Welcome to NeuraScan! Your account has been created.</p>
+                <p class="account-verify-message">Please check your email to verify your account.</p>
+                <button id="account-success-btn" class="btn">Get Started</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load Firebase SDKs at the end of body -->
+    <script src="https://www.gstatic.com/firebasejs/9.19.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.19.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.19.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.19.1/firebase-storage-compat.js"></script>
+
+    <!-- Your configuration and app scripts -->
+    <script src="firebase-config.js"></script>
+    <script src="auth.js"></script>
+    <script src="script.js"></script>
+    
+    <!-- Password Change Modal -->
+    <div class="modal" id="passwordChangeModal">
+        <div class="modal-content">
+            <span class="close-modal" id="close-password-modal">&times;</span>
+            <h2>Change Your Password</h2>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="currentPassword">Current Password</label>
+                    <div class="password-input-wrapper">
+                        <input type="password" id="currentPassword" class="form-control" placeholder="Enter your current password">
+                        <span class="password-toggle" data-for="currentPassword"><i class="far fa-eye"></i></span>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="newPassword">New Password</label>
+                    <div class="password-input-wrapper">
+                        <input type="password" id="newPassword" class="form-control" placeholder="Enter your new password">
+                        <span class="password-toggle" data-for="newPassword"><i class="far fa-eye"></i></span>
+                    </div>
+                    <div class="password-strength-meter">
+                        <div class="strength-bar" id="passwordStrengthBar"></div>
+                    </div>
+                    <p class="password-hint" id="passwordHint">Password should be at least 8 characters</p>
+                    
+                    <div class="password-criteria">
+                        <p class="criteria-title">Password must contain:</p>
+                        <ul class="criteria-list">
+                            <li class="criteria-item" id="length-check"><span class="criteria-icon"><i class="fas fa-times"></i></span> <span class="criteria-text">At least 8 characters</span></li>
+                            <li class="criteria-item" id="uppercase-check"><span class="criteria-icon"><i class="fas fa-times"></i></span> <span class="criteria-text">At least 1 uppercase letter</span></li>
+                            <li class="criteria-item" id="lowercase-check"><span class="criteria-icon"><i class="fas fa-times"></i></span> <span class="criteria-text">At least 1 lowercase letter</span></li>
+                            <li class="criteria-item" id="number-check"><span class="criteria-icon"><i class="fas fa-times"></i></span> <span class="criteria-text">At least 1 number</span></li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm Password</label>
+                    <div class="password-input-wrapper">
+                        <input type="password" id="confirmPassword" class="form-control" placeholder="Confirm your new password">
+                        <span class="password-toggle" data-for="confirmPassword"><i class="far fa-eye"></i></span>
+                    </div>
+                </div>
+                
+                <p class="form-error" id="passwordChangeError"></p>
+                
+                <div class="form-actions" style="display: flex; justify-content: space-between; margin-top: 25px;">
+                    <button id="updatePasswordBtn" class="button-primary">
+                        <i class="fas fa-key"></i> Update Password
+                    </button>
+                    <button id="cancelPasswordChange" class="button-secondary">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom script to fix the navigation highlighting -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
+                const header = document.querySelector('header');
+                const headerHeight = header.offsetHeight;
+                const sections = {};
+                let lastScrollTop = 0;
+                let ticking = false;
+                
+                // Collect all sections
+                navLinks.forEach(link => {
+                    const sectionId = link.getAttribute('href').substring(1);
+                    if (sectionId) {
+                        const section = document.getElementById(sectionId);
+                        if (section) {
+                            sections[sectionId] = {
+                                element: section,
+                                link: link
+                            };
+                        }
+                    }
+                });
+                
+                function updateNavigation() {
+                    const scrollPosition = window.scrollY;
+                    const windowHeight = window.innerHeight;
+                    
+                    // Handle top of page specially
+                    if (scrollPosition < 100) {
+                        navLinks.forEach(link => link.classList.remove('active'));
+                        const homeLink = document.querySelector('.nav-links a[href="#home"]');
+                        if (homeLink) homeLink.classList.add('active');
+                        return;
+                    }
+                    
+                    // Find section with most visibility
+                    let currentSectionId = null;
+                    let maxVisibleArea = 0;
+                    
+                    Object.keys(sections).forEach(sectionId => {
+                        const section = sections[sectionId].element;
+                        const rect = section.getBoundingClientRect();
+                        
+                        // Calculate visible area
+                        const visibleHeight = Math.min(rect.bottom, windowHeight) - Math.max(rect.top, 0);
+                        const visibleWidth = Math.min(rect.right, window.innerWidth) - Math.max(rect.left, 0);
+                        const visibleArea = visibleHeight > 0 ? visibleHeight * visibleWidth : 0;
+                        
+                        if (visibleArea > maxVisibleArea) {
+                            maxVisibleArea = visibleArea;
+                            currentSectionId = sectionId;
+                        }
+                    });
+                    
+                    // Special handling for bottom of page
+                    if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 50) {
+                        const sectionIds = Object.keys(sections);
+                        currentSectionId = sectionIds[sectionIds.length - 1];
+                    }
+                    
+                    // Update navigation
+                    navLinks.forEach(link => link.classList.remove('active'));
+                    if (currentSectionId && sections[currentSectionId]) {
+                        sections[currentSectionId].link.classList.add('active');
+                    }
+                    
+                    ticking = false;
+                }
+                
+                // Throttled scroll event handler
+                function onScroll() {
+                    lastScrollTop = window.scrollY;
+                    if (!ticking) {
+                        window.requestAnimationFrame(() => {
+                            updateNavigation();
+                            ticking = false;
+                        });
+                        ticking = true;
+                    }
+                }
+                
+                // Initial call
+                updateNavigation();
+                
+                // Add scroll listener with throttling for better performance
+                window.addEventListener('scroll', onScroll, { passive: true });
+                
+                // Also handle click events
+                navLinks.forEach(link => {
+                    link.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        
+                        // Remove active class from all links
+                        navLinks.forEach(l => l.classList.remove('active'));
+                        
+                        // Add active class to clicked link
+                        this.classList.add('active');
+                        
+                        // Scroll to section
+                        const targetId = this.getAttribute('href').substring(1);
+                        const targetSection = document.getElementById(targetId);
+                        
+                        if (targetSection) {
+                            const targetPosition = targetSection.offsetTop - headerHeight;
+                            window.scrollTo({
+                                top: targetPosition,
+                                behavior: 'smooth'
+                            });
+                        }
+                    });
+                });
+            }, 100);
+        });
+    </script>
+</body>
+</html>

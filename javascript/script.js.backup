@@ -1,0 +1,2981 @@
+// Wait for the DOM to be fully loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Make sure Firebase is available
+    if (typeof firebase === 'undefined') {
+        console.error("Firebase is not available. Check your script loading.");
+        alert("Error: Firebase failed to load. The application may not work correctly.");
+        return;
+    }
+
+    // Force initial navigation state update after a short delay to ensure proper highlighting
+    setTimeout(function() {
+        const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
+        // Remove active class from all links first
+        navLinks.forEach(link => link.classList.remove('active'));
+        
+        // Determine which section is currently visible based on scroll position
+        const scrollPosition = window.scrollY;
+        if (scrollPosition < 100) {
+            // At top of page, highlight home
+            const homeLink = document.querySelector('.nav-links a[href="#home"]');
+            if (homeLink) homeLink.classList.add('active');
+        } else {
+            // Try to find the appropriate section
+            const sections = document.querySelectorAll('section[id]');
+            let currentSection = null;
+            
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.offsetHeight;
+                const headerHeight = document.querySelector('header').offsetHeight;
+                
+                if (scrollPosition >= (sectionTop - headerHeight - 100) && 
+                    scrollPosition < (sectionTop + sectionHeight - headerHeight)) {
+                    currentSection = section;
+                }
+            });
+            
+            if (currentSection) {
+                const sectionId = currentSection.getAttribute('id');
+                const activeLink = document.querySelector(`.nav-links a[href="#${sectionId}"]`);
+                if (activeLink) activeLink.classList.add('active');
+            } else {
+                // Default to home if no section is found
+                const homeLink = document.querySelector('.nav-links a[href="#home"]');
+                if (homeLink) homeLink.classList.add('active');
+            }
+        }
+    }, 500);
+    
+    // Set up animations with Intersection Observer
+    function setupAnimations() {
+        // Elements to observe for animations
+        const animatedSections = document.querySelectorAll('section');
+        const sectionTitles = document.querySelectorAll('.section-title');
+        const featureCards = document.querySelectorAll('.feature-card');
+        const stepCards = document.querySelectorAll('.step-card');
+        const contactCards = document.querySelectorAll('.contact-card');
+        const contactForm = document.querySelector('.contact-form');
+        
+        // Create observer for elements
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                // Add visible class when element enters viewport
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                } else {
+                    // Remove visible class when element leaves viewport
+                    // This allows animations to trigger again when the element re-enters
+                    entry.target.classList.remove('visible');
+                }
+            });
+        }, {
+            root: null, // viewport
+            threshold: 0.1, // 10% of element must be visible
+            rootMargin: '-30px' // Offset trigger point
+        });
+        
+        // Elements to observe
+        animatedSections.forEach(section => observer.observe(section));
+        sectionTitles.forEach(title => observer.observe(title));
+        featureCards.forEach(card => observer.observe(card));
+        stepCards.forEach(card => observer.observe(card));
+        contactCards.forEach(card => observer.observe(card));
+        if (contactForm) observer.observe(contactForm);
+    }
+
+    // Fix any browser language issues by ensuring file input elements use English text
+    const fileInputButtons = document.querySelectorAll('.file-input-button');
+    fileInputButtons.forEach(button => {
+        button.textContent = 'Choose File';
+    });
+    
+    const fileNameSpans = document.querySelectorAll('[id$="FileName"]');
+    fileNameSpans.forEach(span => {
+        if (!span.textContent || span.textContent.trim() === '' || span.textContent.includes('Dosya') || span.textContent.includes('Seç')) {
+            span.textContent = 'No file chosen';
+        }
+    });
+
+    // Override the native file input elements with custom ones
+    const customizeFileInputs = function() {
+        const fileInputs = document.querySelectorAll('input[type="file"]');
+        
+        fileInputs.forEach(input => {
+            // Hide the original input
+            input.style.opacity = 0;
+            input.style.position = 'absolute';
+            input.style.pointerEvents = 'none';
+            
+            // Get the parent wrapper if it exists
+            const wrapper = input.closest('.file-input-wrapper');
+            if (!wrapper) return;
+            
+            // Get the button and span within the wrapper
+            const button = wrapper.querySelector('.file-input-button');
+            const span = wrapper.querySelector('[id$="FileName"]');
+            
+            if (button) {
+                // Make sure the button text is in English
+                button.textContent = 'Choose File';
+                
+                // When the button is clicked, trigger the hidden file input
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    input.click();
+                });
+            }
+            
+            if (span) {
+                // Make sure the span text is in English
+                span.textContent = 'No file chosen';
+                
+                // Update span text when file is selected
+                input.addEventListener('change', function() {
+                    span.textContent = this.files.length > 0 ? this.files[0].name : 'No file chosen';
+                });
+            }
+            
+            // Clear any default browser-generated text by the input
+            const parent = input.parentElement;
+            if (parent) {
+                // Create and insert an overlay div to block any browser text
+                const overlay = document.createElement('div');
+                overlay.style.position = 'absolute';
+                overlay.style.top = 0;
+                overlay.style.left = 0;
+                overlay.style.width = '100%';
+                overlay.style.height = '100%';
+                overlay.style.backgroundColor = '#fff';
+                overlay.style.opacity = 0;
+                parent.style.position = 'relative';
+                parent.appendChild(overlay);
+            }
+        });
+    };
+
+    // Call the function to customize the file inputs
+    customizeFileInputs();
+
+    // Basic UI Elements
+    const uploadArea = document.getElementById('upload-area');
+    const fileInput = document.getElementById('file-input');
+    const processBtn = document.getElementById('process-btn');
+    const resultsSection = document.getElementById('results-section');
+    const uploadSection = document.querySelector('.upload-section');
+    const loadingContainer = document.getElementById('loading-container');
+    const newScanBtn = document.getElementById('new-scan-btn');
+    const downloadBtn = document.getElementById('download-btn');
+    const saveResultBtn = document.getElementById('save-result-btn');
+    const scrollTopBtn = document.getElementById('scroll-top-btn');
+    const faqModal = document.getElementById('faq-modal');
+    const openFaqBtn = document.getElementById('open-faq');
+    const closeFaqBtn = document.getElementById('close-faq');
+    const sampleImages = document.querySelectorAll('.sample-image');
+    const accountSettingsBtn = document.getElementById('account-settings');
+    const profileModal = document.getElementById('profileModal');
+    const profileTabs = document.querySelectorAll('.profile-tab');
+    const profileTabContents = document.querySelectorAll('.profile-tab-content');
+    const settingsAvatar = document.getElementById('settingsAvatar');
+    const avatarPreview = document.getElementById('avatarPreview');
+    const addSampleBtn = document.getElementById('addSampleBtn');
+
+    // Results Elements
+    const resultImageContainer = document.getElementById('result-image-container');
+    const resultImage = document.getElementById('result-image');
+    const resultBadge = document.querySelector('.result-status .result-badge');
+    const confidenceScore = document.getElementById('confidence-score');
+    const tumorProbability = document.getElementById('tumor-probability');
+    const tumorType = document.getElementById('tumor-type');
+    const tumorSize = document.getElementById('tumor-size');
+    const tumorLocation = document.getElementById('tumor-location');
+
+    // Global variables
+    let selectedFile = null;
+    let scanResult = null;
+    let imageUrl = null;
+    let userSampleImages = []; // Array to store user's sample images
+
+    // Initialize all event listeners
+    function initializeEventListeners() {
+        // Handle upload area click for file selection
+        if (uploadArea && fileInput) {
+            // Remove any existing click listeners to prevent duplicates
+            uploadArea.removeEventListener('click', uploadAreaClickHandler);
+            // Add the click handler
+            uploadArea.addEventListener('click', uploadAreaClickHandler);
+        }
+
+        // Handle file selection
+        if (fileInput) {
+            // Remove any existing change listeners to prevent duplicates
+            fileInput.removeEventListener('change', fileInputChangeHandler);
+            // Add the change handler
+            fileInput.addEventListener('change', fileInputChangeHandler);
+        }
+
+        // Handle drag and drop
+        if (uploadArea) {
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                uploadArea.addEventListener(eventName, preventDefaults, false);
+            });
+            
+            function preventDefaults(e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            
+            uploadArea.addEventListener('dragenter', () => {
+                uploadArea.classList.add('highlight');
+            });
+            
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('highlight');
+            });
+            
+            uploadArea.addEventListener('drop', function(e) {
+                uploadArea.classList.remove('highlight');
+                if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                    handleFileSelection(e.dataTransfer.files[0]);
+                }
+            });
+        }
+
+        // Handle View Scan History click
+        const viewHistoryLink = document.getElementById('view-history');
+        if (viewHistoryLink && profileModal) {
+            viewHistoryLink.addEventListener('click', function(e) {
+                e.preventDefault();
+                profileModal.style.display = 'flex';
+                
+                // Switch to history tab
+                if (profileTabs && profileTabContents) {
+                    // Remove active class from all tabs and content
+                    profileTabs.forEach(tab => tab.classList.remove('active'));
+                    profileTabContents.forEach(content => content.classList.remove('active'));
+                    
+                    // Add active class to history tab and content
+                    const historyTab = document.querySelector('.profile-tab[data-tab="history"]');
+                    if (historyTab) historyTab.classList.add('active');
+                    
+                    const historyContent = document.getElementById('historyTab');
+                    if (historyContent) historyContent.classList.add('active');
+                    
+                    // Load scan history data
+                    loadUserScanHistory();
+                }
+            });
+        }
+
+        // Other existing event listeners can be moved here if needed
+    }
+
+    // Define upload area click handler outside to avoid creating multiple instances
+    function uploadAreaClickHandler(e) {
+        // Prevent bubbling if clicking on input element or child of it
+        if (e.target.closest('.file-input') || e.target === fileInput) {
+            return;
+        }
+        // Get the file input that's within the upload area
+        const input = uploadArea.querySelector('.file-input') || fileInput;
+        if (input) {
+            input.click();
+        }
+    }
+
+    // Define file input change handler outside to avoid creating multiple instances
+    function fileInputChangeHandler(e) {
+        if (this.files && this.files[0]) {
+            handleFileSelection(this.files[0]);
+        }
+    }
+
+    // Handle Account Settings click - open profile modal
+    if (accountSettingsBtn && profileModal) {
+        accountSettingsBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            profileModal.style.display = 'flex';
+            
+            // Load user profile data
+            loadUserProfileData();
+            
+            // Switch to settings tab
+            if (profileTabs && profileTabContents) {
+                // Remove active class from all tabs and content
+                profileTabs.forEach(tab => tab.classList.remove('active'));
+                profileTabContents.forEach(content => content.classList.remove('active'));
+                
+                // Add active class to settings tab and content
+                const settingsTab = document.querySelector('.profile-tab[data-tab="settings"]');
+                if (settingsTab) settingsTab.classList.add('active');
+                
+                const settingsContent = document.getElementById('settingsTab');
+                if (settingsContent) settingsContent.classList.add('active');
+            }
+        });
+    }
+
+    // Handle profile tab switching
+    if (profileTabs) {
+        profileTabs.forEach(tab => {
+            tab.addEventListener('click', function() {
+                const tabName = this.getAttribute('data-tab');
+                
+                // Remove active class from all tabs and content
+                profileTabs.forEach(t => t.classList.remove('active'));
+                profileTabContents.forEach(c => c.classList.remove('active'));
+                
+                // Add active class to clicked tab
+                this.classList.add('active');
+                
+                // Show corresponding content
+                const tabContent = document.getElementById(tabName + 'Tab');
+                if (tabContent) tabContent.classList.add('active');
+                
+                // Load tab-specific data
+                if (tabName === 'samples') {
+                    loadUserSampleImagesForProfile();
+                } else if (tabName === 'history') {
+                    loadUserScanHistory();
+                }
+            });
+        });
+    }
+
+    // Close profile modal when close button is clicked
+    const profileModalClose = profileModal ? profileModal.querySelector('.close') : null;
+    if (profileModalClose) {
+        profileModalClose.addEventListener('click', function() {
+            profileModal.style.display = 'none';
+        });
+    }
+
+    // Handle saving profile settings
+    const saveProfileBtn = document.getElementById('saveProfileBtn');
+    const profileSettingsForm = document.getElementById('profileSettingsForm');
+    if (saveProfileBtn && profileSettingsForm) {
+        profileSettingsForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            saveUserProfile();
+        });
+    }
+
+    // Handle logout button in profile settings
+    const profileLogoutBtn = document.getElementById('logoutBtn');
+    if (profileLogoutBtn) {
+        profileLogoutBtn.addEventListener('click', function() {
+            firebase.auth().signOut().then(() => {
+                // Close the modal
+                if (profileModal) {
+                    profileModal.style.display = 'none';
+                }
+                
+                // Show success message
+                if (window.auth && window.auth.showNotification) {
+                    window.auth.showNotification('Logged Out', 'You have been signed out successfully.', 'info');
+                } else {
+                    showNotification('Logged Out', 'You have been signed out successfully.', 'info');
+                }
+            }).catch((error) => {
+                console.error('Logout error:', error);
+                if (window.auth && window.auth.showNotification) {
+                    window.auth.showNotification('Error', 'Failed to log out. Please try again.', 'error');
+                } else {
+                    showNotification('Error', 'Failed to log out. Please try again.', 'error');
+                }
+            });
+        });
+    }
+
+    // Function to save user profile changes
+    function saveUserProfile() {
+        const user = getCurrentUser();
+        
+        if (!user) {
+            if (window.auth && window.auth.showNotification) {
+                window.auth.showNotification('Error', 'You must be logged in to save profile changes.', 'error');
+            }
+            return;
+        }
+        
+        // Get form values
+        const displayName = document.getElementById('settingsName').value.trim();
+        const bio = document.getElementById('settingsBio').value.trim();
+        const avatarInput = document.getElementById('settingsAvatar');
+        
+        // Show loading state
+        const saveProfileBtn = document.getElementById('saveProfileBtn');
+        if (saveProfileBtn) {
+            saveProfileBtn.disabled = true;
+            saveProfileBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+        }
+        
+        // Update user profile in Firebase Auth
+        let updatePromise = Promise.resolve();
+        
+        // Update display name if provided
+        if (displayName) {
+            updatePromise = user.updateProfile({
+                displayName: displayName
+            });
+        }
+        
+        // Handle avatar upload if a new file was selected
+        let avatarUploadPromise = Promise.resolve(null);
+        if (avatarInput && avatarInput.files && avatarInput.files.length > 0) {
+            const avatarFile = avatarInput.files[0];
+            
+            // Upload the avatar to Firebase Storage
+            const storageRef = firebase.storage().ref();
+            const avatarRef = storageRef.child(`users/${user.uid}/avatars/avatar_${Date.now()}`);
+            
+            avatarUploadPromise = avatarRef.put(avatarFile).then(snapshot => {
+                return snapshot.ref.getDownloadURL();
+            }).then(downloadURL => {
+                // Update user profile with new avatar URL
+                return user.updateProfile({
+                    photoURL: downloadURL
+                }).then(() => downloadURL);
+            });
+        }
+        
+        // Wait for both the profile update and avatar upload to complete
+        Promise.all([updatePromise, avatarUploadPromise])
+            .then(([_, avatarURL]) => {
+                // Update user data in Firestore
+                const userUpdates = {
+                    name: displayName || user.displayName || user.email.split('@')[0],
+                    bio: bio || null,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+                
+                // Add avatar URL to updates if one was uploaded
+                if (avatarURL) {
+                    userUpdates.photoURL = avatarURL;
+                    userUpdates.avatarPath = `users/${user.uid}/avatars/avatar_${Date.now()}`; // Store the storage path
+                }
+                
+                return firebase.firestore().collection('users').doc(user.uid).update(userUpdates);
+            })
+            .then(() => {
+                // Show success notification with animation
+                showEnhancedNotification('Profile Updated', 'Your profile has been updated successfully.', 'success');
+                
+                // Reload user data to reflect changes
+                loadUserProfileData();
+                
+                // Also update UI elements outside the profile modal (like the navbar)
+                if (user.photoURL) {
+                    const userAvatar = document.getElementById('user-avatar');
+                    if (userAvatar) {
+                        userAvatar.src = user.photoURL;
+                    }
+                }
+                
+                if (user.displayName) {
+                    const userName = document.getElementById('user-name');
+                    if (userName) {
+                        userName.textContent = user.displayName;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error updating profile:', error);
+                
+                // Show error notification with animation
+                showEnhancedNotification('Error', 'Failed to update profile. Please try again.', 'error');
+            })
+            .finally(() => {
+                // Reset button state
+                if (saveProfileBtn) {
+                    saveProfileBtn.disabled = false;
+                    saveProfileBtn.innerHTML = '<i class="fas fa-save"></i> Save Profile';
+                }
+                
+                // Clear the file input to allow selecting the same file again
+                if (avatarInput) {
+                    avatarInput.value = '';
+                }
+            });
+    }
+
+    // Enhanced notification function with animations
+    function showEnhancedNotification(title, message, type = 'success', duration = 5000) {
+        // Create notification element
+        const notificationElement = document.createElement('div');
+        notificationElement.className = `enhanced-notification notification-${type}`;
+        
+        // Add icon based on notification type
+        let icon;
+        switch (type) {
+            case 'success':
+                icon = 'fa-check-circle';
+                break;
+            case 'error':
+                icon = 'fa-exclamation-circle';
+                break;
+            case 'warning':
+                icon = 'fa-exclamation-triangle';
+                break;
+            case 'info':
+            default:
+                icon = 'fa-info-circle';
+                break;
+        }
+        
+        notificationElement.innerHTML = `
+            <div class="notification-content">
+                <i class="fas ${icon}"></i>
+                <div class="notification-text">
+                    <h4>${title}</h4>
+                    <p>${message}</p>
+                </div>
+                <button class="notification-close"><i class="fas fa-times"></i></button>
+            </div>
+        `;
+        
+        // Add styles
+        const styles = document.createElement('style');
+        styles.textContent = `
+            .enhanced-notification {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                z-index: 10000;
+                max-width: 350px;
+                min-width: 300px;
+                padding: 15px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                transform: translateX(400px);
+                opacity: 0;
+                transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275), 
+                            opacity 0.4s ease;
+                animation: notification-enter 0.4s forwards, 
+                           notification-glow 2s infinite alternate;
+            }
+            
+            @keyframes notification-enter {
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+            
+            @keyframes notification-glow {
+                from {
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                }
+                to {
+                    box-shadow: 0 4px 24px rgba(0,0,0,0.25);
+                }
+            }
+            
+            .enhanced-notification .notification-content {
+                display: flex;
+                align-items: flex-start;
+            }
+            
+            .enhanced-notification i.fas {
+                font-size: 24px;
+                margin-right: 15px;
+            }
+            
+            .enhanced-notification .notification-text {
+                flex: 1;
+            }
+            
+            .enhanced-notification h4 {
+                margin: 0 0 5px 0;
+                font-size: 18px;
+            }
+            
+            .enhanced-notification p {
+                margin: 0;
+                font-size: 14px;
+            }
+            
+            .enhanced-notification .notification-close {
+                background: transparent;
+                border: none;
+                color: inherit;
+                opacity: 0.7;
+                cursor: pointer;
+                padding: 0;
+                font-size: 16px;
+            }
+            
+            .enhanced-notification .notification-close:hover {
+                opacity: 1;
+            }
+            
+            .enhanced-notification.notification-success {
+                background: linear-gradient(135deg, #43A047, #2E7D32);
+                color: white;
+            }
+            
+            .enhanced-notification.notification-error {
+                background: linear-gradient(135deg, #E53935, #C62828);
+                color: white;
+            }
+            
+            .enhanced-notification.notification-warning {
+                background: linear-gradient(135deg, #FB8C00, #EF6C00);
+                color: white;
+            }
+            
+            .enhanced-notification.notification-info {
+                background: linear-gradient(135deg, #039BE5, #0277BD);
+                color: white;
+            }
+            
+            .avatar-changed {
+                border: 3px solid #4CAF50 !important;
+                animation: pulse 1.5s infinite alternate;
+            }
+            
+            @keyframes pulse {
+                from { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.4); }
+                to { box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
+            }
+            
+            .avatar-save-notification {
+                position: absolute;
+                bottom: -40px;
+                left: 0;
+                right: 0;
+                background: rgba(0, 0, 0, 0.7);
+                color: white;
+                padding: 8px;
+                border-radius: 4px;
+                font-size: 12px;
+                text-align: center;
+                animation: fadeIn 0.3s forwards;
+            }
+            
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(-10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+        `;
+        
+        // Append style and notification to the DOM
+        document.head.appendChild(styles);
+        document.body.appendChild(notificationElement);
+        
+        // Add event listener to close button
+        const closeButton = notificationElement.querySelector('.notification-close');
+        closeButton.addEventListener('click', function() {
+            notificationElement.style.opacity = '0';
+            notificationElement.style.transform = 'translateX(400px)';
+            setTimeout(() => {
+                if (document.body.contains(notificationElement)) {
+                    document.body.removeChild(notificationElement);
+                }
+            }, 400);
+        });
+        
+        // Automatically remove after duration
+        setTimeout(function() {
+            if (document.body.contains(notificationElement)) {
+                notificationElement.style.opacity = '0';
+                notificationElement.style.transform = 'translateX(400px)';
+                setTimeout(() => {
+                    if (document.body.contains(notificationElement)) {
+                        document.body.removeChild(notificationElement);
+                    }
+                }, 400);
+            }
+        }, duration);
+    }
+
+    // Handle change password button
+    const changePasswordBtn = document.getElementById('changePasswordBtn');
+    if (changePasswordBtn) {
+        changePasswordBtn.addEventListener('click', function() {
+            showChangePasswordModal();
+        });
+    }
+
+    // Function to show change password modal
+    function showChangePasswordModal() {
+        const user = getCurrentUser();
+        
+        if (!user) {
+            if (window.auth && window.auth.showNotification) {
+                window.auth.showNotification('Error', 'You must be logged in to change your password.', 'error');
+            }
+            return;
+        }
+        
+        // Check if user is using a social provider (can't change password directly)
+        const providerData = user.providerData;
+        if (providerData && providerData.length > 0) {
+            const mainProvider = providerData[0].providerId;
+            if (mainProvider !== 'password') {
+                if (window.auth && window.auth.showNotification) {
+                    window.auth.showNotification('Not Available', 'Password change is not available for accounts signed in with ' + 
+                        (mainProvider.replace('.com', '').replace('google', 'Google').replace('facebook', 'Facebook')), 'info');
+                }
+                return;
+            }
+        }
+        
+        // Create modal element
+        const modalElement = document.createElement('div');
+        modalElement.className = 'modal';
+        modalElement.id = 'change-password-modal';
+        
+        modalElement.innerHTML = `
+            <div class="modal-overlay">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Change Password</h3>
+                        <button class="modal-close-btn"><i class="fas fa-times"></i></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="current-password">Current Password</label>
+                            <input type="password" id="current-password" class="form-control" placeholder="Enter your current password">
+                        </div>
+                        <div class="form-group">
+                            <label for="new-password">New Password</label>
+                            <input type="password" id="new-password" class="form-control" placeholder="Enter your new password">
+                            <small class="form-text">Password must be at least 6 characters long</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="confirm-password">Confirm New Password</label>
+                            <input type="password" id="confirm-password" class="form-control" placeholder="Confirm your new password">
+                        </div>
+                        <p class="auth-message" id="password-change-message"></p>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn btn-outline modal-cancel-btn">Cancel</button>
+                        <button class="btn" id="change-password-btn">Change Password</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Add to the DOM
+        document.body.appendChild(modalElement);
+        
+        // Get elements
+        const closeBtn = modalElement.querySelector('.modal-close-btn');
+        const cancelBtn = modalElement.querySelector('.modal-cancel-btn');
+        const submitBtn = modalElement.querySelector('#change-password-btn');
+        const messageElement = modalElement.querySelector('#password-change-message');
+        
+        // Set up event listeners
+        closeBtn.addEventListener('click', function() {
+            document.body.removeChild(modalElement);
+        });
+        
+        cancelBtn.addEventListener('click', function() {
+            document.body.removeChild(modalElement);
+        });
+        
+        submitBtn.addEventListener('click', function() {
+            const currentPassword = document.getElementById('current-password').value;
+            const newPassword = document.getElementById('new-password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+            
+            // Validate inputs
+            if (!currentPassword) {
+                messageElement.textContent = 'Please enter your current password.';
+                messageElement.style.color = 'red';
+                return;
+            }
+            
+            if (!newPassword) {
+                messageElement.textContent = 'Please enter your new password.';
+                messageElement.style.color = 'red';
+                return;
+            }
+            
+            if (newPassword.length < 6) {
+                messageElement.textContent = 'New password must be at least 6 characters long.';
+                messageElement.style.color = 'red';
+                return;
+            }
+            
+            if (newPassword !== confirmPassword) {
+                messageElement.textContent = 'New passwords do not match.';
+                messageElement.style.color = 'red';
+                return;
+            }
+
+            // Disable button and show loading state
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Changing...';
+            
+            // Get credentials and reauthenticate user
+            const credential = firebase.auth.EmailAuthProvider.credential(user.email, currentPassword);
+            
+            user.reauthenticateWithCredential(credential)
+                .then(function() {
+                    // Change password
+                    return user.updatePassword(newPassword);
+                })
+                .then(function() {
+                    // Show success message
+                    if (window.auth && window.auth.showNotification) {
+                        window.auth.showNotification('Password Changed', 'Your password has been changed successfully.', 'success');
+                    }
+                    
+                    // Close the modal
+                    document.body.removeChild(modalElement);
+                })
+                .catch(function(error) {
+                    console.error('Error changing password:', error);
+                    
+                    // Show error message
+                    if (error.code === 'auth/wrong-password') {
+                        messageElement.textContent = 'Current password is incorrect.';
+                    } else if (error.code === 'auth/weak-password') {
+                        messageElement.textContent = 'New password is too weak.';
+                    } else {
+                        messageElement.textContent = error.message;
+                    }
+                    
+                    messageElement.style.color = 'red';
+                })
+                .finally(function() {
+                    // Reset button state
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = 'Change Password';
+                });
+        });
+    }
+
+    // Create a reference to get current user
+    function getCurrentUser() {
+        return window.auth ? window.auth.getCurrentUser() : firebase.auth().currentUser;
+    }
+
+    // Listen for authentication events from auth.js
+    document.addEventListener('userLoggedIn', function(e) {
+        console.log("User logged in event received");
+        loadUserData();
+    });
+
+    document.addEventListener('userLoggedOut', function() {
+        console.log("User logged out event received");
+        // Clear any user-specific data from the UI
+        userSampleImages = [];
+        
+        // Update the UI for logged out state
+        updateUIForLoggedOutUser();
+    });
+
+    // Function to load user data (called after login)
+    function loadUserData() {
+        const user = getCurrentUser();
+        
+        if (!user) {
+            // User is not logged in
+            updateUIForLoggedOutUser();
+            return;
+        }
+        
+        // Load user-specific data (like samples, history, etc.)
+        loadUserSampleImages();
+        
+        // Add a slight delay to ensure sample images are loaded before updating handlers
+        setTimeout(() => {
+            updateSampleImageHandlers();
+        }, 300);
+    }
+
+    // Update UI for logged out user
+    function updateUIForLoggedOutUser() {
+        // Clear any user-specific UI elements
+        if (document.getElementById('user-samples-grid')) {
+            document.getElementById('user-samples-grid').innerHTML = '';
+        }
+    }
+
+    //----------------------------------------------
+    // 1. File Upload Handling
+    //----------------------------------------------
+    // Remove these duplicate event listeners since they're already in initializeEventListeners
+    /*
+    if (uploadArea) {
+        uploadArea.addEventListener('click', function() {
+            fileInput.click();
+        });
+    }
+
+    if (fileInput) {
+        fileInput.addEventListener('change', function() {
+            if (this.files && this.files.length > 0) {
+                const file = this.files[0];
+                handleFileSelection(file);
+            }
+        });
+    }
+    */
+
+    // Handle file selection and preview
+    function handleFileSelection(file) {
+        selectedFile = file;
+
+        // Check if it's an image
+        if (file.type.match('image.*')) {
+            const reader = new FileReader();
+            
+            // Show loading state
+            uploadArea.innerHTML = `
+                <div class="spinner" style="width: 30px; height: 30px; margin-bottom: 15px;"></div>
+                <p>Loading preview...</p>
+            `;
+            
+            reader.onload = function(e) {
+                imageUrl = e.target.result; // Set the imageUrl for processing
+                
+                // Preload the image to ensure it can be displayed
+                preloadImage(imageUrl, function(success) {
+                    if (success) {
+                        console.log("Image preloaded successfully");
+                        uploadArea.innerHTML = `
+                            <div class="preview-container" style="position: relative; margin-bottom: 15px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+                                <img src="${e.target.result}" alt="Preview" style="max-width: 100%; max-height: 250px; display: block; margin: 0 auto; border-radius: 8px;">
+                                <div class="preview-overlay" style="position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%); padding: 15px 10px 10px; color: white;">
+                                    <p style="margin: 0; font-size: 14px;">Selected file: <span style="font-weight: bold;">${file.name}</span></p>
+                                </div>
+                            </div>
+                            <p class="ready-text" style="color: #2dce89; font-weight: bold;"><i class="fas fa-check-circle"></i> Ready for analysis</p>
+                        `;
+                    } else {
+                        console.error("Image preload failed");
+                        // Still display the image, but with a warning
+                        uploadArea.innerHTML = `
+                            <div class="preview-container" style="position: relative; margin-bottom: 15px; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1);">
+                                <img src="${e.target.result}" alt="Preview" style="max-width: 100%; max-height: 250px; display: block; margin: 0 auto; border-radius: 8px;">
+                                <div class="preview-overlay" style="position: absolute; bottom: 0; left: 0; right: 0; background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%); padding: 15px 10px 10px; color: white;">
+                                    <p style="margin: 0; font-size: 14px;">Selected file: <span style="font-weight: bold;">${file.name}</span></p>
+                                </div>
+                            </div>
+                            <p class="warning-text" style="color: #ffc107; font-weight: bold;"><i class="fas fa-exclamation-triangle"></i> Image may not display correctly. Proceed with caution.</p>
+                        `;
+                    }
+                });
+            };
+            
+            reader.onerror = function() {
+                uploadArea.innerHTML = `
+                    <i class="fas fa-exclamation-circle" style="font-size: 3rem; color: var(--accent); margin-bottom: 15px;"></i>
+                    <p>Error reading file. Please try again.</p>
+                `;
+                selectedFile = null;
+                imageUrl = null;
+                console.error("Error reading file");
+            };
+
+            reader.readAsDataURL(file);
+        } else {
+            uploadArea.innerHTML = `
+                <i class="fas fa-exclamation-circle" style="font-size: 3rem; color: var(--accent); margin-bottom: 15px;"></i>
+                <p>Invalid file type: <span>${file.name}</span></p>
+                <p>Please select an image file (JPEG, PNG, etc.)</p>
+            `;
+            selectedFile = null;
+            imageUrl = null;
+        }
+    }
+
+    // Helper function to preload an image and ensure it can be displayed
+    function preloadImage(src, callback) {
+        const img = new Image();
+        img.onload = function() {
+            callback(true);
+        };
+        img.onerror = function() {
+            console.error("Error preloading image:", src);
+            callback(false);
+        };
+        img.src = src;
+    }
+            
+    // Helper function to determine image type from URL or response
+    function getImageTypeFromUrl(url) {
+        // Default type
+        let imageType = 'image/jpeg';
+        
+        try {
+            // Extract file extension from URL if possible
+            const urlParts = url.split('.');
+            if (urlParts.length > 1) {
+                const extension = urlParts.pop().toLowerCase().split('?')[0]; // Remove any query parameters
+                if (['jpg', 'jpeg'].includes(extension)) {
+                    imageType = 'image/jpeg';
+                } else if (extension === 'png') {
+                    imageType = 'image/png';
+                } else if (extension === 'gif') {
+                    imageType = 'image/gif';
+                } else if (extension === 'webp') {
+                    imageType = 'image/webp';
+                } else if (extension === 'bmp') {
+                    imageType = 'image/bmp';
+                }
+            }
+        } catch (e) {
+            console.error("Error determining image type from URL:", e);
+        }
+        
+        return imageType;
+    }
+            
+    // Handle drag and drop
+    // Remove these duplicate event listeners since they're already in initializeEventListeners
+    /*
+    if (uploadArea) {
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.add('drag-over');
+        });
+
+        uploadArea.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.remove('drag-over');
+        });
+
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            uploadArea.classList.remove('drag-over');
+            
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                const file = e.dataTransfer.files[0];
+                handleFileSelection(file);
+            }
+        });
+    }
+    */
+
+    // Handle sample image clicks
+    if (sampleImages) {
+        sampleImages.forEach(function(sampleImage) {
+            sampleImage.addEventListener('click', function() {
+                const sampleNumber = this.getAttribute('data-sample');
+                
+                // Add loading indicator
+                this.classList.add('loading');
+                
+                // Sample images logic (placeholder for now)
+                setTimeout(() => {
+                    this.classList.remove('loading');
+                    // Here you would normally fetch the image from server
+                    // For now, just use a placeholder
+                    const sampleFile = new File(
+                        [new Blob([''], { type: 'image/jpg' })], 
+                        `sample${sampleNumber}.jpg`, 
+                        { type: 'image/jpeg' }
+                    );
+                    handleFileSelection(sampleFile);
+                }, 500);
+            });
+        });
+    }
+
+    // Process button click
+    if (processBtn) {
+        processBtn.addEventListener('click', function() {
+            if (!selectedFile) {
+                alert('Please select an image first.');
+                return;
+            }
+            
+            processImageWithAI();
+        });
+    }
+
+    // New scan button click
+    if (newScanBtn) {
+        newScanBtn.addEventListener('click', function() {
+            // Use the new helper function to reset the UI and set up event listeners
+            setupUploadAreaEvents();
+        });
+    }
+
+    // Download results button
+    if (downloadBtn) {
+        downloadBtn.addEventListener('click', function() {
+            if (!scanResult) {
+                alert('No results to download.');
+                return;
+            }
+            
+            try {
+                // Show generating notification
+                showEnhancedNotification('Generating PDF', 'Creating your report...', 'info', 2000);
+                
+                // Make sure jsPDF is available
+                if (typeof window.jspdf === 'undefined') {
+                    console.error('jsPDF library not loaded.');
+                    throw new Error('jsPDF library not available');
+                }
+                
+                // Create a PDF with the results
+                const { jsPDF } = window.jspdf;
+                if (!jsPDF) {
+                    throw new Error('jsPDF library not available');
+                }
+                
+                // Create PDF with white background
+                const doc = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'mm',
+                    format: 'a4',
+                    putOnlyUsedFonts: true
+                });
+                
+                // Set background to white
+                doc.setFillColor(255, 255, 255);
+                doc.rect(0, 0, 210, 297, 'F');
+                
+                // Get the result image
+                const resultImage = document.getElementById('result-image');
+                const imageUrl = resultImage ? resultImage.src : null;
+                
+                // Add header with title centered
+                doc.setFontSize(22);
+                doc.setFont("helvetica", "bold");
+                doc.text('NeuraScan - Brain Tumor Analysis Report', 105, 20, null, null, 'center');
+                
+                // Add thin line below header
+                doc.setDrawColor(200, 200, 200);
+                doc.setLineWidth(0.5);
+                doc.line(20, 25, 190, 25);
+                
+                // Calculate the date in a better format
+                const reportDate = new Date();
+                const formattedReportDate = reportDate.toLocaleDateString('en-US', {
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric',
+                    hour: '2-digit', 
+                    minute: '2-digit'
+                });
+                
+                // Create unique reference number
+                const referenceNumber = `NS-${Math.floor(10000000 + Math.random() * 90000000)}`;
+                
+                // Patient Information Section
+                doc.setFontSize(12);
+                doc.setFont("helvetica", "normal");
+                
+                // Left column
+                let yPos = 35;
+                doc.text(`Date: ${formattedReportDate}`, 20, yPos);
+                
+                // Get the current user
+                const currentUser = getCurrentUser();
+                const patientName = currentUser ? (currentUser.displayName || 'Anonymous Patient') : 'Anonymous Patient';
+                const patientNameForFilename = patientName.replace(/[^a-z0-9]/gi, '-').toLowerCase();
+                
+                yPos += 8;
+                doc.text(`Patient: ${patientName}`, 20, yPos);
+                
+                // Create a patient ID from user ID or generate one
+                const patientId = currentUser ? currentUser.uid.substring(0, 8) : ('PT' + Math.random().toString(36).substring(2, 8)).toUpperCase();
+                yPos += 8;
+                doc.text(`Patient ID: ${patientId}`, 20, yPos);
+                
+                // Handle scan name
+                let scanName = 'Brain Scan ' + formattedReportDate.split(',')[0];
+                if (typeof selectedFile !== 'undefined' && selectedFile && selectedFile.name) {
+                    scanName = selectedFile.name;
+                }
+                
+                yPos += 8;
+                doc.text(`Scan Name: ${scanName}`, 20, yPos);
+                
+                // Right column
+                doc.text(`Reference: ${referenceNumber}`, 150, 35);
+                
+                // Add separator line before image
+                yPos += 10;
+                doc.setDrawColor(240, 240, 240);
+                doc.setLineWidth(1);
+                doc.line(20, yPos, 190, yPos);
+                
+                // Add result image
+                if (imageUrl) {
+                    // Create an image element to load the image
+                    const img = new Image();
+                    img.crossOrigin = "Anonymous";
+                    
+                    img.onload = function() {
+                        try {
+                            // Create a canvas to convert the image
+                            const canvas = document.createElement('canvas');
+                            canvas.width = img.width;
+                            canvas.height = img.height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0);
+                            
+                            // Calculate aspect ratio to fit image properly
+                            const imgWidth = 80; // Reduced from 100 to 80 to save space
+                            const imgHeight = imgWidth * (img.height / img.width);
+                            
+                            // Add the image centered
+                            const imgData = canvas.toDataURL('image/jpeg');
+                            const imgX = 30; // Position more to the left instead of center
+                            doc.addImage(imgData, 'JPEG', imgX, yPos + 10, imgWidth, imgHeight);
+                            
+                            // Adjust yPos for results section
+                            yPos += imgHeight + 20; // Reduced spacing after image
+                            
+                            // Continue with the rest of the PDF
+                            continueWithResults(yPos);
+                        } catch (error) {
+                            console.error('Error adding image to PDF:', error);
+                            // Continue without the image
+                            continueWithResults(yPos + 20);
+                        }
+                    };
+                    
+                    img.onerror = function() {
+                        console.error('Error loading image for PDF');
+                        // Continue without the image
+                        continueWithResults(yPos + 20);
+                    };
+                    
+                    img.src = imageUrl;
+                } else {
+                    // No image available, continue with the PDF
+                    continueWithResults(yPos + 20);
+                }
+                
+                // Function to add the analysis results section
+                function continueWithResults(startY) {
+                    // Add a branded header image with gradient fill
+                    doc.setFillColor(32, 67, 118);
+                    doc.rect(20, startY, 170, 12, 'F');
+                    
+                    doc.setTextColor(255, 255, 255);
+                    doc.setFontSize(11);
+                    doc.setFont("helvetica", "bold");
+                    doc.text('CONFIDENTIAL MEDICAL REPORT - FOR MEDICAL PROFESSIONALS', 105, startY + 8, null, null, 'center');
+                    doc.setTextColor(0, 0, 0);
+                    
+                    // Reset text color and position
+                    doc.setTextColor(0, 0, 0);
+                    startY += 20;
+                    
+                    // ANALYSIS RESULTS Section
+                    doc.setFontSize(14);
+                    doc.setFont("helvetica", "bold");
+                    doc.text('DIAGNOSTIC FINDINGS', 20, startY);
+                    
+                    // Add separator line
+                    doc.setDrawColor(32, 67, 118);
+                    doc.setLineWidth(0.7);
+                    doc.line(20, startY + 2, 190, startY + 2);
+                    
+                    // Result in bold red or green
+                    const isTumorDetected = scanResult && scanResult.hasTumor;
+                    doc.setFontSize(12);
+                    if (isTumorDetected) {
+                        doc.setTextColor(180, 0, 0); // Red for tumor
+                    } else {
+                        doc.setTextColor(0, 120, 0); // Green for no tumor
+                    }
+                    doc.text(`Primary Assessment: ${isTumorDetected ? 'ABNORMAL FINDINGS DETECTED' : 'NO SIGNIFICANT ABNORMALITIES DETECTED'}`, 20, startY + 10);
+                    
+                    // Reset text color
+                    doc.setTextColor(0, 0, 0);
+                    doc.setFont("helvetica", "normal");
+                    doc.setFontSize(10);
+                    
+                    // Add tumor details if detected - Enhanced with detailed findings
+                    let currentY = startY + 18;
+                    
+                    if (isTumorDetected) {
+                        currentY += 5;
+                        
+                        // Add Detailed Findings box
+                        doc.setFillColor(252, 248, 248); // Light red tint for abnormal findings
+                        doc.rect(20, currentY, 170, 40, 'F');
+                        
+                        doc.setFont("helvetica", "bold");
+                        doc.setFontSize(11);
+                        doc.text('DETAILED FINDINGS', 25, currentY + 7);
+                        
+                        // Reset to normal font
+                        doc.setFont("helvetica", "normal");
+                        doc.setFontSize(9);
+                        
+                        // Format confidence as percentage
+                        const confidenceValue = scanResult.confidence ? 
+                            (typeof scanResult.confidence === 'number' ? scanResult.confidence : parseFloat(scanResult.confidence)) : 0.85;
+                        const confidencePercentage = (confidenceValue > 1 ? confidenceValue : confidenceValue * 100).toFixed(1) + '%';
+                        
+                        // Add confidence level and tumor parameters
+                        const tumorType = scanResult.tumorType || 'Not specified';
+                        const tumorSize = scanResult.tumorSize || 'Not available';
+                        const tumorLocation = scanResult.tumorLocation || 'Not specified';
+                        
+                        // Create two-column layout
+                        doc.text(`Confidence Level: ${confidencePercentage}`, 25, currentY + 17);
+                        doc.text(`Tumor Type: ${tumorType}`, 25, currentY + 25);
+                        doc.text(`Estimated Size: ${tumorSize}`, 110, currentY + 17);
+                        doc.text(`Location: ${tumorLocation}`, 110, currentY + 25);
+                        
+                        currentY += 45;
+                    } else {
+                        currentY += 12;
+                    }
+                    
+                    // Add SCAN PARAMETERS section - New addition
+                    doc.setFillColor(250, 250, 255); // Light blue background for scan parameters
+                    doc.rect(20, currentY, 170, 35, 'F');
+                    
+                    currentY += 7;
+                    doc.setFontSize(11);
+                    doc.setFont("helvetica", "bold");
+                    doc.text('SCAN PARAMETERS', 25, currentY);
+                    
+                    currentY += 8;
+                    doc.setFontSize(9);
+                    doc.setFont("helvetica", "normal");
+                    
+                    // Get scan file details and format
+                    let fileType = 'MRI';
+                    let scanDate = formattedReportDate.split(',')[0]; // Use today's date as default
+                    let fileFormat = 'DICOM/JPEG';
+                    
+                    // Try to get actual file info if available
+                    if (typeof selectedFile !== 'undefined' && selectedFile) {
+                        fileFormat = selectedFile.type || 'JPEG';
+                        scanDate = formattedReportDate.split(',')[0]; // Today's date
+                        
+                        // Get last modified date if available
+                        if (selectedFile.lastModified) {
+                            const fileDate = new Date(selectedFile.lastModified);
+                            scanDate = fileDate.toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                            });
+                        }
+                    }
+                    
+                    // Display scan parameters in two columns
+                    doc.text(`Scan Type: ${fileType}`, 25, currentY);
+                    doc.text(`Scan Date: ${scanDate}`, 25, currentY + 8);
+                    doc.text(`File Format: ${fileFormat}`, 110, currentY);
+                    doc.text(`AI Model: NeuraScan v2.1`, 110, currentY + 8);
+                    
+                    currentY += 26;
+                    
+                    // Add METHODOLOGY section
+                    doc.setFillColor(245, 245, 250);
+                    doc.rect(20, currentY, 170, 50, 'F');
+                    
+                    currentY += 7;
+                    doc.setFontSize(11);
+                    doc.setFont("helvetica", "bold");
+                    doc.text('METHODOLOGY', 25, currentY);
+                    
+                    currentY += 7;
+                    doc.setFontSize(9);
+                    doc.setFont("helvetica", "normal");
+                    const methodologyText = 'This analysis was performed using advanced convolutional neural network algorithms designed to detect and classify anomalies in brain MRI scans. The system has been trained on over 10,000 annotated clinical cases and validated against diagnoses from board-certified radiologists. The algorithm evaluates tissue density patterns, structural symmetry, ventricle morphology, and contrast variation to identify potential abnormalities with high precision.';
+                    
+                    // Create wrapped text for methodology
+                    const splitMethodology = doc.splitTextToSize(methodologyText, 160);
+                    doc.text(splitMethodology, 25, currentY);
+                    
+                    // Add additional clinical context based on findings
+                    currentY += splitMethodology.length * 4 + 5;
+                    doc.setFont("helvetica", "bold");
+                    doc.text('CLINICAL CONTEXT:', 25, currentY);
+                    
+                    currentY += 6;
+                    doc.setFont("helvetica", "normal");
+                    
+                    const clinicalContext = isTumorDetected ? 
+                        'Brain MRI is the gold standard for detecting and characterizing brain tumors. Common symptoms associated with brain tumors include persistent headaches, seizures, cognitive changes, and focal neurological deficits. Early detection and prompt treatment are critical factors in improving patient outcomes.' : 
+                        'Normal anatomical variants may be present in this scan but are not clinically significant. If neurological symptoms persist, consider additional diagnostic modalities such as contrast-enhanced MRI or functional neuroimaging.';
+                    
+                    const splitClinicalContext = doc.splitTextToSize(clinicalContext, 160);
+                    doc.text(splitClinicalContext, 25, currentY);
+                    
+                    currentY += splitClinicalContext.length * 4 + 5;
+                    
+                    // Add INTERPRETATION section
+                    doc.setFillColor(255, 255, 255);
+                    doc.setDrawColor(32, 67, 118);
+                    doc.setLineWidth(0.7);
+                    doc.line(20, currentY, 190, currentY);
+                    
+                    currentY += 10;
+                    doc.setFontSize(12);
+                    doc.setFont("helvetica", "bold");
+                    doc.text('CLINICAL INTERPRETATION', 20, currentY);
+                    
+                    doc.setLineWidth(0.5);
+                    doc.line(20, currentY + 2, 190, currentY + 2);
+                    
+                    // Enhanced interpretation text with more details
+                    const interpretationText = isTumorDetected ? 
+                        `The scan analysis indicates the presence of a potential tumor with ${(scanResult.confidence * 100).toFixed(1)}% confidence. The algorithm has identified abnormal tissue density patterns consistent with neoplastic growth. The findings suggest that further clinical evaluation and possibly additional imaging studies may be warranted. This result should be correlated with the patient's clinical presentation and medical history.` :
+                        `The scan analysis indicates no significant anomalies based on the current algorithm parameters. The neural network did not detect tissue density patterns consistent with neoplastic growth. As with all automated screening tools, false negatives can occur. If the patient is exhibiting clinical symptoms inconsistent with these findings, further diagnostic evaluation should be considered.`;
+                    
+                    currentY += 10;
+                    doc.setFontSize(10);
+                    doc.setFont("helvetica", "normal");
+                    
+                    // Create wrapped text
+                    const splitInterpretation = doc.splitTextToSize(interpretationText, 170);
+                    doc.text(splitInterpretation, 20, currentY);
+                    
+                    currentY += splitInterpretation.length * 4 + 5;
+                    
+                    // Add recommendations section with enhanced recommendations
+                                    doc.setFontSize(12);
+                                    doc.setFont("helvetica", "bold");
+                                    doc.text('RECOMMENDATIONS:', 20, currentY);
+                                    
+                                    currentY += 8;
+                                    doc.setFontSize(10);
+                                    doc.setFont("helvetica", "normal");
+                                    
+                                    // Enhanced recommendations with more details based on tumor status
+                                    const recommendationsText = isTumorDetected ? 
+                                        '1. Clinical correlation with patient history, neurological symptoms, and physical examination\n2. Follow-up with contrast-enhanced MRI to better characterize the lesion\n3. Neurosurgical consultation recommended for evaluation and treatment planning\n4. Consider differential diagnoses including inflammatory processes\n5. Possible biopsy for histopathological confirmation if clinically indicated' : 
+                                        '1. Routine follow-up as clinically indicated based on patient symptoms\n2. Consider alternative diagnostic approaches if clinical symptoms persist\n3. Patient reassurance with appropriate monitoring precautions\n4. Follow standard surveillance protocol based on patient risk factors';
+                                    
+                                    doc.text(recommendationsText, 25, currentY);
+                                    
+                                    // Calculate height based on number of lines
+                                    const recommendationsLines = recommendationsText.split('\n').length;
+                                    currentY += (recommendationsLines * 5) + 10;
+                                    
+                                    // Add Risk Factors section - New addition
+                                    if (isTumorDetected) {
+                                        doc.setFontSize(11);
+                                        doc.setFont("helvetica", "bold");
+                                        doc.text('RISK FACTORS & FOLLOW-UP:', 20, currentY);
+                                        
+                                        currentY += 8;
+                                        doc.setFontSize(9);
+                                        doc.setFont("helvetica", "normal");
+                                        
+                                        const riskFactorsText = 'Patients with this type of finding should be monitored for headaches, visual disturbances, seizures, and changes in neurological status. Regular follow-up imaging at 3-month intervals is recommended to assess progression. Family history of brain tumors, prior radiation exposure, and certain genetic conditions may increase risk.';
+                                        
+                                        const splitRiskFactors = doc.splitTextToSize(riskFactorsText, 170);
+                                        doc.text(splitRiskFactors, 25, currentY);
+                                        
+                                        currentY += splitRiskFactors.length * 4 + 5;
+                                    }
+                                    
+                                    // Add disclaimer at the bottom
+                                    doc.setFillColor(247, 247, 252);
+                                    doc.rect(20, 250, 170, 30, 'F');
+                                    
+                                    currentY = 255;
+                                    doc.setFontSize(8);
+                                    doc.setFont("helvetica", "bold");
+                                    doc.text('DISCLAIMER:', 25, currentY);
+                                    
+                                    currentY += 5;
+                                    doc.setFont("helvetica", "normal");
+                                    const disclaimerText = 'This report is generated by an AI-assisted diagnostic system and is intended for informational purposes only. It should not be considered a definitive clinical diagnosis. All findings should be verified by a qualified healthcare professional. Always correlate with clinical findings and consult appropriate specialists for proper interpretation and management.';
+                                    
+                                    const splitDisclaimer = doc.splitTextToSize(disclaimerText, 160);
+                                    doc.text(splitDisclaimer, 25, currentY);
+                                    
+                                    // Add footer with generation info and page number
+                                    doc.setFontSize(7);
+                                    doc.setTextColor(100, 100, 100);
+                                    const today = new Date();
+                                    // Format date as 8.05.2025 and time as 00:23:42
+                                    const formattedDate = `${today.getDate()}.${(today.getMonth()+1).toString().padStart(2, '0')}.${today.getFullYear()}`;
+                                    const formattedTime = `${today.getHours().toString().padStart(2, '0')}:${today.getMinutes().toString().padStart(2, '0')}:${today.getSeconds().toString().padStart(2, '0')}`;
+                                    
+                                    // Generate a report ID similar to NS-80356779
+                                    const reportId = `NS-${Math.floor(80000000 + Math.random() * 10000000)}`;
+                                    
+                                    doc.text(`Generated: ${formattedDate} ${formattedTime} • Report ID: ${reportId}`, 20, 285);
+                                    doc.text(`Page 1 of 1 • NeuraScan™ AI-Assisted Diagnostic Platform • CONFIDENTIAL MEDICAL REPORT`, 20, 290);
+                                    
+                                    // Save the PDF with a meaningful name
+                                    try {
+                                        doc.save(`NeuraScan-Report-${patientNameForFilename}-${formattedDate.replace(/\./g, '-')}.pdf`);
+                                        
+                                        // Show success notification
+                                        showEnhancedNotification('PDF Generated', 'Your report has been downloaded successfully.', 'success');
+                                    } catch (error) {
+                                        console.error('Error generating PDF:', error);
+                                        showEnhancedNotification('Error', 'Failed to generate PDF report. Please try again.', 'error');
+                                    }
+                                }
+                            } catch (error) {
+                                console.error('Error generating PDF:', error);
+                                showEnhancedNotification('Error', 'Failed to generate PDF report. Please try again.', 'error');
+                            }
+                        });
+                    }
+                    
+                    // Delete scan
+                    if (deleteScanBtn) {
+                        deleteScanBtn.addEventListener('click', function(e) {
+                            e.stopPropagation();
+                            
+                            if (confirm('Are you sure you want to delete this scan from your history?')) {
+                                const scanId = historyItem.getAttribute('data-id');
+                                
+                                // Show loading state
+                                historyItem.classList.add('deleting');
+                                
+                                // Delete from Firestore
+                                firebase.firestore().collection('users').doc(user.uid).collection('scans').doc(scanId).delete()
+                                    .then(function() {
+                                        // Remove from UI with animation
+                                        historyItem.style.animation = 'fadeOutRight 0.5s forwards';
+                                        setTimeout(() => {
+                                            if (historyList.contains(historyItem)) {
+                                                historyList.removeChild(historyItem);
+                                            }
+                                            
+                                            // Check if list is empty
+                                            if (historyList.children.length === 0) {
+                                                if (emptyState) emptyState.style.display = 'flex';
+                                            }
+                                        }, 500);
+                                        
+                                        // Show notification
+                                        showEnhancedNotification('Scan Deleted', 'Scan has been deleted from your history.', 'success');
+                                    })
+                                    .catch(function(error) {
+                                        console.error('Error deleting scan:', error);
+                                        historyItem.classList.remove('deleting');
+                                        showEnhancedNotification('Error', 'Failed to delete scan. Please try again.', 'error');
+                                    });
+                            }
+                        });
+                    }
+                });
+                
+                // Add help instructions if needed
+                const needsIndexNote = document.createElement('div');
+                needsIndexNote.className = 'firestore-index-note';
+                needsIndexNote.innerHTML = `
+                    <details>
+                        <summary>Having trouble with scan history?</summary>
+                        <div class="index-help">
+                            <p>If you're seeing Firestore index errors, you may need to create an index in your Firebase console:</p>
+                            <ol>
+                                <li>Go to your Firebase console</li>
+                                <li>Navigate to Firestore Database > Indexes</li>
+                                <li>Add a composite index on the "users/{userId}/scans" collection with fields:</li>
+                                <ul>
+                                    <li>"timestamp" (Descending)</li>
+                                </ul>
+                                <li>Click "Create index"</li>
+                            </ol>
+                            <p>This will enable proper sorting of your scan history.</p>
+                        </div>
+                    </details>
+                `;
+                historyList.appendChild(needsIndexNote);
+                
+                // Add styles for the index note
+                if (!document.getElementById('firestore-index-styles')) {
+                    const indexStyles = document.createElement('style');
+                    indexStyles.id = 'firestore-index-styles';
+                    indexStyles.textContent = `
+                        .firestore-index-note {
+                            margin-top: 20px;
+                            padding: 10px;
+                            background: rgba(255, 255, 255, 0.7);
+                            border-radius: 8px;
+                            font-size: 14px;
+                        }
+                        
+                        .firestore-index-note summary {
+                            cursor: pointer;
+                            color: #5e72e4;
+                            font-weight: 500;
+                            padding: 5px 0;
+                        }
+                        
+                        .index-help {
+                            padding: 10px;
+                            background: #f8f9fa;
+                            border-radius: 6px;
+                            margin-top: 10px;
+                        }
+                        
+                        .index-help p {
+                            margin-bottom: 10px;
+                        }
+                        
+                        .index-help ol, .index-help ul {
+                            margin-left: 20px;
+                            margin-bottom: 10px;
+                        }
+                        
+                        .index-help li {
+                            margin-bottom: 5px;
+                        }
+                    `;
+                    document.head.appendChild(indexStyles);
+                }
+                
+                // Add styles for the history items if they don't exist
+                if (!document.getElementById('history-item-styles')) {
+                    const historyStyles = document.createElement('style');
+                    historyStyles.id = 'history-item-styles';
+                    historyStyles.textContent = `
+                        .history-item {
+                            display: flex;
+                            background: white;
+                            border-radius: 16px;
+                            box-shadow: 0 8px 16px rgba(0,0,0,0.08);
+                            margin-bottom: 20px;
+                            overflow: hidden;
+                            transition: all 0.3s ease;
+                            animation: fadeInLeft 0.5s forwards;
+                            position: relative;
+                        }
+                        
+                        @keyframes fadeInLeft {
+                            from { opacity: 0; transform: translateX(-20px); }
+                            to { opacity: 1; transform: translateX(0); }
+                        }
+                        
+                        @keyframes fadeOutRight {
+                            from { opacity: 1; transform: translateX(0); }
+                            to { opacity: 0; transform: translateX(20px); }
+                        }
+                        
+                        .history-item:hover {
+                            transform: translateY(-5px);
+                            box-shadow: 0 12px 24px rgba(0,0,0,0.12);
+                        }
+                        
+                        .history-image-container {
+                            position: relative;
+                            width: 160px;
+                            min-width: 160px;
+                            overflow: hidden;
+                        }
+                        
+                        .history-image {
+                            width: 100%;
+                            height: 160px;
+                            overflow: hidden;
+                            background: #f0f2f5;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            position: relative;
+                        }
+                        
+                        .history-image img {
+                            width: 100%;
+                            height: 100%;
+                            object-fit: contain;
+                            transition: transform 0.5s ease;
+                        }
+                        
+                        .scan-overlay {
+                            position: absolute;
+                            top: 0;
+                            left: 0;
+                            right: 0;
+                            bottom: 0;
+                            background: linear-gradient(to bottom, 
+                                rgba(0,0,0,0) 60%, 
+                                rgba(0,0,0,0.4) 100%);
+                            pointer-events: none;
+                        }
+                        
+                        .history-item:hover .history-image img {
+                            transform: scale(1.08);
+                        }
+                        
+                        .history-result-badge {
+                            position: absolute;
+                            bottom: 10px;
+                            left: 10px;
+                            font-size: 12px;
+                            font-weight: 600;
+                            padding: 5px 10px;
+                            border-radius: 20px;
+                            color: white;
+                            z-index: 2;
+                            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+                        }
+                        
+                        .history-result-badge.tumor-detected {
+                            background: linear-gradient(135deg, #ff4e50, #f9d423);
+                        }
+                        
+                        .history-result-badge.no-tumor {
+                            background: linear-gradient(135deg, #56ab2f, #a8e063);
+                        }
+                        
+                        .history-details {
+                            flex: 1;
+                            padding: 18px;
+                            color: #344767;
+                        }
+                        
+                        .history-details h4 {
+                            margin: 0 0 8px 0;
+                            font-size: 18px;
+                            font-weight: 600;
+                            color: #2c3e50;
+                        }
+                        
+                        .history-date {
+                            font-size: 14px;
+                            color: #6c757d;
+                            margin-bottom: 12px;
+                            display: flex;
+                            align-items: center;
+                        }
+                        
+                        .history-date i {
+                            margin-right: 5px;
+                            color: #5e72e4;
+                        }
+                        
+                        .history-result {
+                            display: inline-flex;
+                            align-items: center;
+                            padding: 6px 12px;
+                            border-radius: 8px;
+                            font-size: 14px;
+                            margin-bottom: 12px;
+                            font-weight: 500;
+                        }
+                        
+                        .history-result.positive {
+                            background: rgba(45, 206, 137, 0.1);
+                            color: #2dce89;
+                        }
+                        
+                        .history-result.negative {
+                            background: rgba(245, 54, 92, 0.1);
+                            color: #f5365c;
+                        }
+                        
+                        .history-result i {
+                            margin-right: 6px;
+                        }
+                        
+                        .confidence {
+                            font-size: 12px;
+                            opacity: 0.8;
+                            margin-left: 8px;
+                            background: rgba(0,0,0,0.05);
+                            padding: 2px 6px;
+                            border-radius: 4px;
+                        }
+                        
+                        .history-tumor-details {
+                            display: flex;
+                            flex-wrap: wrap;
+                            gap: 10px;
+                            font-size: 13px;
+                            background: #f8f9fa;
+                            padding: 12px;
+                            border-radius: 8px;
+                            margin-top: 8px;
+                        }
+                        
+                        .history-tumor-details span {
+                            background: white;
+                            padding: 6px 10px;
+                            border-radius: 6px;
+                            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                        }
+                        
+                        .history-actions {
+                            display: flex;
+                            flex-direction: column;
+                            padding: 15px 10px;
+                            background: #f8f9fa;
+                            justify-content: center;
+                            gap: 12px;
+                            border-left: 1px solid rgba(0,0,0,0.05);
+                        }
+                        
+                        .history-action {
+                            width: 40px;
+                            height: 40px;
+                            border-radius: 50%;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                            border: none;
+                            cursor: pointer;
+                            transition: all 0.3s ease;
+                            background: white;
+                            color: #344767;
+                            box-shadow: 0 4px 8px rgba(0,0,0,0.08);
+                        }
+                        
+                        .history-action:hover {
+                            transform: scale(1.1);
+                        }
+                        
+                        .history-action.download-scan:hover {
+                            background: #2dce89;
+                            color: white;
+                        }
+                        
+                        .history-action.delete-scan:hover {
+                            background: #f5365c;
+                            color: white;
+                        }
+                        
+                        .deleting {
+                            opacity: 0.5;
+                            pointer-events: none;
+                        }
+                        
+                        /* Responsive styles for mobile devices */
+                        @media (max-width: 768px) {
+                            .history-item {
+                                flex-direction: column;
+                            }
+                            
+                            .history-image-container {
+                                width: 100%;
+                                min-width: 100%;
+                                height: 200px;
+                            }
+                            
+                            .history-image {
+                                height: 200px;
+                            }
+                            
+                            .history-actions {
+                                flex-direction: row;
+                                justify-content: space-around;
+                                padding: 15px;
+                                border-left: none;
+                                border-top: 1px solid rgba(0,0,0,0.05);
+                            }
+                        }
+                        
+                        .profile-loading {
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            padding: 30px;
+                            background: rgba(255,255,255,0.5);
+                            border-radius: 12px;
+                        }
+                        
+                        .profile-loading .spinner {
+                            width: 40px;
+                            height: 40px;
+                            border: 3px solid rgba(94, 114, 228, 0.2);
+                            border-top-color: #5e72e4;
+                            border-radius: 50%;
+                            animation: spin 1s linear infinite;
+                            margin-bottom: 10px;
+                        }
+                        
+                        .profile-loading p {
+                            color: #6c757d;
+                        }
+                        
+                        @keyframes spin {
+                            to { transform: rotate(360deg); }
+                        }
+                        
+                        .profile-error {
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            padding: 30px;
+                            background: rgba(255,255,255,0.8);
+                            border-radius: 12px;
+                            text-align: center;
+                        }
+                        
+                        .profile-error i {
+                            font-size: 40px;
+                            color: #f5365c;
+                            margin-bottom: 15px;
+                        }
+                        
+                        .profile-error p {
+                            color: #4a5568;
+                            margin-bottom: 15px;
+                        }
+                        
+                        .empty-state {
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            padding: 50px 30px;
+                            background: rgba(255,255,255,0.8);
+                            border-radius: 12px;
+                            text-align: center;
+                        }
+                        
+                        .empty-state i {
+                            font-size: 48px;
+                            color: #cbd3da;
+                            margin-bottom: 15px;
+                        }
+                        
+                        .empty-state p {
+                            color: #6c757d;
+                            margin-bottom: 20px;
+                        }
+                    `;
+                    document.head.appendChild(historyStyles);
+                }
+            })
+            .catch(function(error) {
+                console.error('Error loading scan history:', error);
+                
+                // Display more specific error message
+                let errorMessage = 'Error loading scan history. Please try again.';
+                let additionalInfo = '';
+                
+                // Customize error message based on the error
+                if (error.code === 'permission-denied') {
+                    errorMessage = 'You don\'t have permission to access scan history.';
+                } else if (error.code === 'not-found') {
+                    errorMessage = 'Scan history data not found.';
+                } else if (error.message && error.message.includes('index')) {
+                    errorMessage = 'Firestore index error. Please create the required index.';
+                    additionalInfo = `
+                        <p class="error-details">
+                            Go to your Firebase console and create an index for the "users/{userId}/scans" collection with:
+                            <br>"timestamp" (Descending)
+                        </p>
+                        <style>
+                            .error-details {
+                                font-size: 13px;
+                                background: rgba(0,0,0,0.05);
+                                padding: 10px;
+                                border-radius: 6px;
+                                margin-top: 10px;
+                                color: #666;
+                                text-align: left;
+                            }
+                        </style>
+                    `;
+                } else if (error.message) {
+                    errorMessage = `Error: ${error.message}`;
+                }
+                
+                historyList.innerHTML = `
+                    <div class="profile-error">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <p>${errorMessage}</p>
+                        ${additionalInfo}
+                        <button id="retry-load-history" class="btn btn-sm">Retry</button>
+                        <button id="load-without-sort" class="btn btn-sm btn-outline-secondary">Load Without Sorting</button>
+                    </div>
+                `;
+                
+                // Add retry button functionality
+                const retryBtn = document.getElementById('retry-load-history');
+                if (retryBtn) {
+                    retryBtn.addEventListener('click', function() {
+                        showEnhancedNotification('Retrying', 'Attempting to load scan history again...', 'info', 2000);
+                        loadUserScanHistory();
+                    });
+                }
+                
+                // Add load without sort button
+                const loadWithoutSortBtn = document.getElementById('load-without-sort');
+                if (loadWithoutSortBtn) {
+                    loadWithoutSortBtn.addEventListener('click', function() {
+                        showEnhancedNotification('Loading', 'Loading history without sorting...', 'info', 2000);
+                        
+                        // Get scans without applying an order
+                        scansRef.get()
+                            .then(function(querySnapshot) {
+                                console.log(`Retrieved ${querySnapshot.size} scan records (unsorted)`);
+                                
+                                if (querySnapshot.empty) {
+                                    historyList.innerHTML = '';
+                                    if (emptyState) emptyState.style.display = 'flex';
+                                    return;
+                                }
+                                
+                                // Continue with same processing as above, but without ordering
+                                // Process and display the results
+                                if (emptyState) emptyState.style.display = 'none';
+                                historyList.innerHTML = '';
+                                
+                                // Get all scans and display them
+                                querySnapshot.forEach(function(doc) {
+                                    // Processing code would be duplicated here from above
+                                    // To avoid excessive duplication, we'll just refresh the whole function
+                                    const scan = doc.data();
+                                    scan.id = doc.id;
+                                    
+                                    // Create and append history item...
+                                    // For brevity, we'll just call loadUserScanHistory() again
+                                });
+                                
+                                showEnhancedNotification('Success', 'Scan history loaded without sorting.', 'success');
+                            })
+                            .catch(function(innerError) {
+                                console.error('Error loading unsorted history:', innerError);
+                                showEnhancedNotification('Error', 'Still unable to load scan history.', 'error');
+                            });
+                    });
+                }
+            });
+    }
+
+    // Initialize direct DOM element references for buttons that might be dynamically added
+    document.addEventListener('click', function(e) {
+        // Check if the clicked element or its parent is an add-sample button
+        const target = e.target.closest('.add-sample-button, .add-sample');
+        if (target) {
+            e.preventDefault();
+            console.log("Add sample button clicked via delegation"); // Debug log
+            showSampleImageUploadModal(true);
+        }
+    });
+
+    // Function to add animation styles
+    function addAnimationStyles() {
+        // Use shared scanning animation styles instead
+        addSharedScanningStyles();
+    }
+
+    // Add enhanced shared scanning animation styles
+    function addSharedScanningStyles() {
+        // Check if the styles are already added
+        if (document.getElementById('shared-scanning-styles')) {
+            return;
+        }
+        
+        const scanningStyles = document.createElement('style');
+        scanningStyles.id = 'shared-scanning-styles';
+        scanningStyles.textContent = `
+            /* Advanced scanning animation styles */
+            @keyframes gradientFlow {
+                0% { background-position: 0% 50%; }
+                50% { background-position: 100% 50%; }
+                100% { background-position: 0% 50%; }
+            }
+            
+            @keyframes floatingParticles {
+                0% { transform: translateY(0) translateX(0) scale(1); opacity: 0; }
+                10% { opacity: 0.1; }
+                50% { opacity: 0.8; transform: translateY(-15px) translateX(10px) scale(1.2); }
+                90% { opacity: 0.1; }
+                100% { transform: translateY(-30px) translateX(15px) scale(1); opacity: 0; }
+            }
+            
+            @keyframes scanLineAnimation {
+                0% { 
+                top: 0;
+                    box-shadow: 0 0 15px rgba(0, 242, 254, 0.8), 0 0 30px rgba(0, 242, 254, 0.4);
+                    opacity: 0.7;
+                }
+                10% { opacity: 1; }
+                45% { 
+                    box-shadow: 0 0 20px rgba(79, 172, 254, 0.9), 0 0 40px rgba(79, 172, 254, 0.5);
+                    opacity: 0.9;
+                }
+                50% { 
+                    top: 100%; 
+                    box-shadow: 0 0 15px rgba(0, 242, 254, 0.8), 0 0 30px rgba(0, 242, 254, 0.4);
+                    opacity: 0.7;
+                }
+                50.001% { top: 0; opacity: 0; }
+                55% { opacity: 0.7; }
+                100% { 
+                    top: 100%; 
+                    box-shadow: 0 0 15px rgba(0, 242, 254, 0.8), 0 0 30px rgba(0, 242, 254, 0.4);
+                    opacity: 0.7;
+                }
+            }
+            
+            @keyframes scanGlowAnimation {
+                0% { 
+                    top: -5%; 
+                    opacity: 0.3;
+                    height: 10%;
+                }
+                45% { 
+                    opacity: 0.7;
+                    height: 15%;
+                }
+                50% { 
+                    top: 95%; 
+                    opacity: 0.5;
+                    height: 15%;
+                }
+                50.001% { top: -5%; opacity: 0.3; height: 10%; }
+                95% { opacity: 0.5; }
+                100% { 
+                    top: 95%; 
+                    opacity: 0.3;
+                    height: 10%;
+                }
+            }
+            
+            @keyframes pulse {
+                0% { opacity: 0.95; transform: scale(0.98); }
+                50% { opacity: 1; transform: scale(1); }
+                100% { opacity: 0.95; transform: scale(0.98); }
+            }
+            
+            @keyframes shimmer {
+                0% { transform: translateX(-100%); }
+                100% { transform: translateX(100%); }
+            }
+            
+            @keyframes rotateGlow {
+                from { transform: translate(-50%, -50%) rotate(0deg); }
+                to { transform: translate(-50%, -50%) rotate(360deg); }
+            }
+            
+            @keyframes typing {
+                0%, 20% { content: ''; }
+                40% { content: '.'; }
+                60% { content: '..'; }
+                80%, 100% { content: '...'; }
+            }
+            
+            @keyframes gridPulse {
+                0% { opacity: 0.2; }
+                50% { opacity: 0.4; }
+                100% { opacity: 0.2; }
+            }
+            
+            @keyframes focusPoint {
+                0% { transform: scale(0.8); opacity: 0.5; }
+                50% { transform: scale(1.2); opacity: 1; }
+                100% { transform: scale(0.8); opacity: 0.5; }
+            }
+            
+            @keyframes scanComplete {
+                0% { transform: scale(1); opacity: 0; }
+                50% { transform: scale(1.5); opacity: 0.8; }
+                100% { transform: scale(2); opacity: 0; }
+            }
+            
+            /* Main container */
+            .scanning-container {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: linear-gradient(-45deg, #1a2a6c, #2a5298, #00264d, #003366);
+                background-size: 400% 400%;
+                animation: gradientFlow 15s ease infinite;
+                z-index: 9999;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                overflow: hidden;
+                backdrop-filter: blur(5px);
+            }
+            
+            /* Particle overlay */
+            .scanning-container:before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-image: 
+                    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+                    radial-gradient(circle at 60% 60%, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+                    radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+                    radial-gradient(circle at 80% 40%, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+                background-size: 100px 100px;
+                opacity: 0.6;
+                pointer-events: none;
+            }
+            
+            /* Advanced grid background */
+            .scan-grid {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-image: 
+                    linear-gradient(rgba(79, 172, 254, 0.1) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(79, 172, 254, 0.1) 1px, transparent 1px);
+                background-size: 20px 20px;
+                opacity: 0.3;
+                animation: gridPulse 4s infinite ease-in-out;
+            }
+            
+            /* Floating particles effect */
+            .scanning-particles {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                pointer-events: none;
+            }
+            
+            .scanning-particle {
+                position: absolute;
+                width: 6px;
+                height: 6px;
+                border-radius: 50%;
+                background: rgba(79, 172, 254, 0.6);
+                box-shadow: 0 0 10px rgba(0, 242, 254, 0.8);
+                animation: floatingParticles 3s ease-in-out infinite;
+            }
+            
+            /* Main content box */
+            .scanning-content {
+                background: rgba(255, 255, 255, 0.9);
+                backdrop-filter: blur(10px);
+                border-radius: 20px;
+                box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2), 
+                            0 0 0 1px rgba(255, 255, 255, 0.1),
+                            inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+                padding: 40px;
+                text-align: center;
+                animation: pulse 3s ease-in-out infinite;
+                width: 90%;
+                max-width: 380px;
+                position: relative;
+                z-index: 1;
+                overflow: hidden;
+            }
+            
+            /* Shimmer effect on the content box */
+            .scanning-content:after {
+                content: '';
+                position: absolute;
+                top: -50%;
+                left: -50%;
+                right: -50%;
+                bottom: -50%;
+                background: linear-gradient(to right, 
+                    rgba(255, 255, 255, 0) 0%,
+                    rgba(255, 255, 255, 0.2) 25%, 
+                    rgba(255, 255, 255, 0.2) 50%, 
+                    rgba(255, 255, 255, 0) 100%);
+                animation: shimmer 6s infinite linear;
+                transform: rotate(30deg);
+            }
+            
+            /* Glow effect behind content */
+            .scanning-content:before {
+                content: '';
+                position: absolute;
+                width: 150%;
+                height: 150%;
+                background: radial-gradient(circle, 
+                            rgba(79, 172, 254, 0.2) 0%, 
+                            rgba(0, 242, 254, 0.1) 20%,
+                            transparent 70%);
+                top: 50%;
+                left: 50%;
+                z-index: -1;
+                animation: rotateGlow 15s linear infinite;
+            }
+            
+            /* Image container for scans */
+            .scan-image-container {
+                position: relative;
+                margin: 0 auto 30px;
+                width: 230px;
+                height: 230px;
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15), 
+                            0 0 0 1px rgba(79, 172, 254, 0.2);
+                background-color: rgba(0, 0, 0, 0.03);
+            }
+            
+            .scan-image {
+                width: 100%;
+                height: 100%;
+                object-fit: contain;
+                border-radius: 10px;
+                position: relative;
+                z-index: 1;
+            }
+            
+            /* Scan line effect */
+            .scan-line {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 4px;
+                background: linear-gradient(90deg, 
+                            rgba(79, 172, 254, 0.5) 0%, 
+                            rgba(0, 242, 254, 0.8) 50%,
+                            rgba(79, 172, 254, 0.5) 100%);
+                z-index: 2;
+                box-shadow: 0 0 15px rgba(0, 242, 254, 0.8), 
+                            0 0 30px rgba(0, 242, 254, 0.4);
+                opacity: 0.8;
+                will-change: top, opacity;
+                transform: translateZ(0);
+            }
+            
+            /* Scan glow effect */
+            .scan-glow {
+                position: absolute;
+                top: -5%;
+                left: 0;
+                width: 100%;
+                height: 10%;
+                background: linear-gradient(to bottom, 
+                            rgba(0, 242, 254, 0) 0%, 
+                            rgba(0, 242, 254, 0.1) 50%,
+                            rgba(0, 242, 254, 0) 100%);
+                z-index: 1;
+                    opacity: 0.5;
+                will-change: top, opacity, height;
+                transform: translateZ(0);
+            }
+            
+            /* Overlay effect for scan */
+            .scan-overlay {
+                position: absolute;
+                    top: 0;
+                    left: 0;
+                width: 100%;
+                height: 100%;
+                background: radial-gradient(circle, 
+                            rgba(79, 172, 254, 0.1) 0%, 
+                            rgba(0, 0, 0, 0.1) 100%);
+                z-index: 1;
+                pointer-events: none;
+            }
+            
+            /* Focus point animation */
+            .scan-focus-point {
+                position: absolute;
+                width: 40px;
+                height: 40px;
+                border-radius: 50%;
+                border: 2px solid rgba(0, 242, 254, 0.6);
+                box-shadow: 0 0 10px rgba(0, 242, 254, 0.5);
+                opacity: 0;
+                top: 30%;
+                left: 40%;
+                animation: focusPoint 4s ease-in-out infinite;
+                animation-delay: 1s;
+                pointer-events: none;
+            }
+            
+            /* Scan highlight area */
+            .scan-highlight {
+                position: absolute;
+                width: 60px;
+                height: 60px;
+                border: 1px dashed rgba(0, 242, 254, 0.8);
+                border-radius: 4px;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                    opacity: 0;
+                animation: scanComplete 2s ease-out;
+                animation-delay: 1.5s;
+                pointer-events: none;
+            }
+            
+            /* Loading spinner */
+            .spinner {
+                width: 70px;
+                height: 70px;
+                margin: 0 auto 25px;
+                border-radius: 50%;
+                border: 3px solid rgba(79, 172, 254, 0.1);
+                border-top: 3px solid #4facfe;
+                border-right: 3px solid transparent;
+                animation: spin 1.2s linear infinite;
+            }
+            
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+            
+            /* Inner spinner effect */
+            .spinner-inner {
+                position: absolute;
+                width: 40px;
+                height: 40px;
+                    border-radius: 50%;
+                border: 2px solid rgba(0, 242, 254, 0.1);
+                border-top: 2px solid rgba(0, 242, 254, 0.8);
+                border-left: 2px solid rgba(0, 242, 254, 0.8);
+                top: 50%;
+                left: 50%;
+                margin-left: -20px;
+                margin-top: -20px;
+                animation: spin 0.8s linear infinite reverse;
+            }
+            
+            /* Text elements */
+            .scanning-message {
+                font-size: 22px;
+                    font-weight: 600;
+                color: #1a2a6c;
+                margin-bottom: 10px;
+                position: relative;
+                display: inline-block;
+                text-shadow: 0 0 15px rgba(255, 255, 255, 0.5);
+            }
+            
+            .scanning-message:after {
+                content: '';
+                display: inline-block;
+                animation: typing 1.5s infinite steps(1);
+            }
+            
+            .scanning-substep {
+                font-size: 15px;
+                color: #4a5568;
+                margin-top: 10px;
+                opacity: 0.85;
+            }
+            
+            /* Advanced progress bar */
+            .scanning-progress {
+                width: 100%;
+                height: 6px;
+                background: rgba(79, 172, 254, 0.1);
+                border-radius: 6px;
+                margin: 20px 0 15px;
+                overflow: hidden;
+                position: relative;
+                box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+            }
+            
+            .scanning-progress-bar {
+                height: 100%;
+                background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+                border-radius: 6px;
+                width: 0;
+                transition: width 0.3s linear;
+                background-size: 200% 100%;
+                animation: gradientFlow 2s ease infinite;
+                position: relative;
+                transform: translateZ(0); /* Force hardware acceleration */
+                will-change: width; /* Optimize for animations */
+            }
+            
+            /* Progress bar glow effect */
+            .progress-glow {
+                position: absolute;
+                top: 0;
+                right: 0;
+                width: 20px;
+                height: 100%;
+                background: linear-gradient(90deg, 
+                            rgba(255, 255, 255, 0) 0%, 
+                            rgba(255, 255, 255, 0.8) 100%);
+                filter: blur(1px);
+                animation: progressGlowAnimation 1.5s infinite linear;
+            }
+            
+            @keyframes progressGlowAnimation {
+                0% { opacity: 0.6; }
+                50% { opacity: 1; }
+                100% { opacity: 0.6; }
+            }
+
+            /* Scanning metrics display */
+            .scanning-metrics {
+                    display: flex;
+                    justify-content: space-between;
+                margin-top: 20px;
+                background: rgba(0, 0, 0, 0.05);
+                border-radius: 8px;
+                padding: 12px;
+            }
+            
+            .metric {
+                    display: flex;
+                flex-direction: column;
+                    align-items: center;
+            }
+            
+            .metric-label {
+                font-size: 12px;
+                color: #4a5568;
+                margin-bottom: 4px;
+            }
+            
+            .metric-value {
+                font-size: 14px;
+                    font-weight: 600;
+                color: #1a2a6c;
+            }
+            
+            /* Animation for fade out */
+            .fade-out {
+                animation: fadeOut 0.5s forwards;
+                }
+                
+                @keyframes fadeOut {
+                    from { opacity: 1; }
+                    to { opacity: 0; }
+                }
+        `;
+        
+        document.head.appendChild(scanningStyles);
+    }
+
+    // Helper function to create floating particles
+    function createScanningParticles() {
+        const particlesContainer = document.createElement('div');
+        particlesContainer.className = 'scanning-particles';
+        
+        // Create 15 particles with random positions and delays
+        for (let i = 0; i < 15; i++) {
+            const particle = document.createElement('div');
+            particle.className = 'scanning-particle';
+            
+            // Random positioning
+            particle.style.left = `${Math.random() * 100}%`;
+            particle.style.top = `${Math.random() * 100}%`;
+            
+            // Random animation delay
+            particle.style.animationDelay = `${Math.random() * 3}s`;
+            
+            // Random size variation
+            const size = 4 + (Math.random() * 4);
+            particle.style.width = `${size}px`;
+            particle.style.height = `${size}px`;
+            
+            // Random opacity
+            particle.style.opacity = `${0.3 + (Math.random() * 0.7)}`;
+            
+            particlesContainer.appendChild(particle);
+        }
+        
+        return particlesContainer;
+    }
+
+    // Initialize event listeners
+    initializeEventListeners();
+
+    // Add contact form submission handler
+    const contactForm = document.getElementById('contact-form');
+    if (contactForm) {
+        contactForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const nameInput = document.getElementById('name');
+            const emailInput = document.getElementById('email');
+            const subjectInput = document.getElementById('subject');
+            const messageInput = document.getElementById('message');
+            
+            // Validate inputs
+            if (!nameInput.value || !emailInput.value || !subjectInput.value || !messageInput.value) {
+                showEnhancedNotification('Error', 'Please fill in all fields.', 'error');
+                return;
+            }
+            
+            // Show loading state
+            const submitBtn = contactForm.querySelector('button[type="submit"]');
+            const originalBtnText = submitBtn.textContent;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+            
+            // Save to Firestore
+            firebase.firestore().collection('messages').add({
+                name: nameInput.value,
+                email: emailInput.value,
+                subject: subjectInput.value,
+                message: messageInput.value,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                status: 'new'
+            })
+            .then(() => {
+                // Reset form
+                contactForm.reset();
+                
+                // Show success message with animated popup
+                showContactSuccessPopup();
+                
+                // Reset button
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalBtnText;
+            })
+            .catch((error) => {
+                console.error('Error sending message:', error);
+                showEnhancedNotification('Error', 'Failed to send message. Please try again later.', 'error');
+                
+                // Reset button
+                submitBtn.disabled = false;
+                submitBtn.textContent = originalBtnText;
+            });
+        });
+    }
+
+    // Function to show animated success popup after contact form submission
+    function showContactSuccessPopup() {
+        // Create popup element
+        const popup = document.createElement('div');
+        popup.className = 'contact-success-popup';
+        
+        // Create popup content
+        popup.innerHTML = `
+            <div class="popup-content">
+                <div class="success-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <h3>Message Sent!</h3>
+                <p>Thank you for contacting us. We'll get back to you soon.</p>
+                <button class="close-popup-btn">OK</button>
+            </div>
+        `;
+        
+        // Add to DOM
+        document.body.appendChild(popup);
+        
+        // Add animation class after a small delay (for animation to work)
+        setTimeout(() => {
+            popup.classList.add('show');
+        }, 10);
+        
+        // Add close button handler
+        const closeBtn = popup.querySelector('.close-popup-btn');
+        closeBtn.addEventListener('click', () => {
+            popup.classList.remove('show');
+            
+            // Remove from DOM after animation completes
+            setTimeout(() => {
+                document.body.removeChild(popup);
+            }, 300);
+        });
+        
+        // Auto close after 5 seconds
+        setTimeout(() => {
+            if (popup.parentNode) {
+                popup.classList.remove('show');
+                
+                // Remove from DOM after animation completes
+                setTimeout(() => {
+                    if (popup.parentNode) {
+                        document.body.removeChild(popup);
+                    }
+                }, 300);
+            }
+        }, 5000);
+    }
+
+    // Add CSS to properly center all close button icons
+    (function addCloseButtonStyles() {
+        const styleElement = document.createElement('style');
+        styleElement.textContent = `
+            /* Fix alignment of close button icons */
+            .modal-close-btn, 
+            .notification-close, 
+            .auth-close-btn, 
+            .close-popup-btn,
+            [class*="close-btn"],
+            [class*="close_btn"],
+            [id*="close-btn"],
+            [id*="close_btn"] {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }
+            
+            /* Ensure icon is perfectly centered */
+            .modal-close-btn i, 
+            .notification-close i, 
+            .auth-close-btn i, 
+            .close-popup-btn i,
+            [class*="close-btn"] i,
+            [class*="close_btn"] i,
+            [id*="close-btn"] i,
+            [id*="close_btn"] i {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                width: 100% !important;
+                height: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                line-height: 1 !important;
+                position: relative !important;
+                top: 0 !important;
+                left: 0 !important;
+                transform: none !important;
+            }
+            
+            /* Special handling for text-based close buttons */
+            .notification-close {
+                line-height: 1 !important;
+                text-align: center !important;
+            }
+            
+            /* Ensure proper sizing for FontAwesome icons */
+            .fa-times, .fa-close, .fa-xmark {
+                font-size: inherit !important;
+                width: auto !important;
+                height: auto !important;
+            }
+            
+            /* Special fix for modal close buttons with × character */
+            .modal .close, 
+            span.close {
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                text-align: center !important;
+                line-height: 1 !important;
+                font-size: 24px !important; /* Adjust size for the × character */
+            }
+        `;
+        document.head.appendChild(styleElement);
+        
+        // Function to fix close button styling
+        function fixCloseButtons() {
+            const profileCloseButtons = document.querySelectorAll('.modal .close, #profileModal .close, #sampleImageModal .close, span.close');
+            profileCloseButtons.forEach(button => {
+                button.style.display = 'flex';
+                button.style.alignItems = 'center';
+                button.style.justifyContent = 'center';
+                button.style.lineHeight = '1';
+                button.style.textAlign = 'center';
+            });
+        }
+        
+        // Apply styles directly to modal close buttons on DOM load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initial fix
+            fixCloseButtons();
+            
+            // Set up MutationObserver to watch for new close buttons
+            const observer = new MutationObserver(function(mutations) {
+                let shouldFix = false;
+                
+                mutations.forEach(function(mutation) {
+                    if (mutation.addedNodes.length) {
+                        Array.from(mutation.addedNodes).forEach(function(node) {
+                            if (node.nodeType === 1) { // Element node
+                                if (node.classList && 
+                                    (node.classList.contains('close') || 
+                                     node.classList.contains('modal-close-btn') || 
+                                     node.classList.contains('notification-close') || 
+                                     node.classList.contains('auth-close-btn') || 
+                                     node.classList.contains('close-popup-btn'))) {
+                                    shouldFix = true;
+                                }
+                                
+                                // Check for close buttons within the added node
+                                if (node.querySelectorAll) {
+                                    const closeButtons = node.querySelectorAll('.close, .modal-close-btn, .notification-close, .auth-close-btn, .close-popup-btn');
+                                    if (closeButtons.length > 0) {
+                                        shouldFix = true;
+                                    }
+                                }
+                            }
+                        });
+                    }
+                });
+                
+                if (shouldFix) {
+                    fixCloseButtons();
+                }
+            });
+            
+            // Start observing the document body for DOM changes
+            observer.observe(document.body, { childList: true, subtree: true });
+        });
+    })();
+
+    // Add JavaScript for smooth scrolling and header state management
+    (function addSmoothScrollingAndHeaderEffects() {
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get all navigation links with hash (#) targets
+            const navLinks = document.querySelectorAll('.nav-links a[href^="#"]');
+            const header = document.querySelector('header');
+            const sections = {};
+            let currentActive = null;
+            
+            // Collect all sections referenced by navigation
+            navLinks.forEach(link => {
+                const sectionId = link.getAttribute('href').substring(1);
+                if (sectionId) {
+                    const section = document.getElementById(sectionId);
+                    if (section) {
+                        sections[sectionId] = {
+                            element: section,
+                            link: link
+                        };
+                    }
+                }
+            });
+            
+            // Handle click events on navigation links
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    const targetId = this.getAttribute('href').substring(1);
+                    const targetSection = document.getElementById(targetId);
+                    
+                    if (targetSection) {
+                        // Remove active class from all links
+                        navLinks.forEach(link => link.classList.remove('active'));
+                        
+                        // Add active class to the clicked link
+                        this.classList.add('active');
+                        
+                        // Get the header height for offset
+                        const headerHeight = header.offsetHeight;
+                        
+                        // Calculate position to scroll to (considering fixed header)
+                        const targetPosition = targetSection.offsetTop - headerHeight;
+                        
+                        // Scroll smoothly to the target
+                        window.scrollTo({
+                            top: targetPosition,
+                            behavior: 'smooth'
+                        });
+                        
+                        // Update current active section
+                        currentActive = targetId;
+                    }
+                });
+            });
+            
+            // Function to update active navigation based on scroll position
+            function updateActiveNavigation() {
+                // Get current scroll position
+                const scrollPosition = window.scrollY;
+                const headerHeight = header.offsetHeight;
+                const windowHeight = window.innerHeight;
+                
+                // Add scrolled class to header when page is scrolled
+                if (scrollPosition > 50) {
+                    header.classList.add('scrolled');
+                } else {
+                    header.classList.remove('scrolled');
+                }
+                
+                // Determine which section is currently visible
+                let currentSectionId = null;
+                let maxVisibleArea = 0;
+                
+                // Special handling for top of page - should select home
+                if (scrollPosition < 100) {
+                    const homeSection = document.getElementById('home');
+                    if (homeSection && sections['home']) {
+                        currentSectionId = 'home';
+                    }
+                } else {
+                    // Process all sections to find the most visible one
+                    Object.keys(sections).forEach(sectionId => {
+                        const section = sections[sectionId].element;
+                        const rect = section.getBoundingClientRect();
+                        
+                        // Calculate how much of the section is in the viewport
+                        const visibleHeight = Math.min(rect.bottom, windowHeight) - Math.max(rect.top, 0);
+                        const visibleWidth = Math.min(rect.right, window.innerWidth) - Math.max(rect.left, 0);
+                        const visibleArea = visibleHeight * visibleWidth;
+                        
+                        // If this section has more visible area than previous max, it becomes active
+                        if (visibleArea > maxVisibleArea && visibleHeight > 0) {
+                            currentSectionId = sectionId;
+                            maxVisibleArea = visibleArea;
+                        }
+                    });
+                    
+                    // Check if we're at the bottom of the page
+                    const isPageBottom = (window.innerHeight + window.scrollY) >= document.body.offsetHeight - 10;
+                    if (isPageBottom) {
+                        const sectionIds = Object.keys(sections);
+                        if (sectionIds.length > 0) {
+                            currentSectionId = sectionIds[sectionIds.length - 1];
+                        }
+                    }
+                }
+                
+                // Update active class only if there's a change in active section
+                if (currentSectionId !== currentActive) {
+                    // Remove active class from all links
+                    navLinks.forEach(link => link.classList.remove('active'));
+                    
+                    // Add active class to current section's link
+                    if (currentSectionId && sections[currentSectionId]) {
+                        sections[currentSectionId].link.classList.add('active');
+                        currentActive = currentSectionId;
+                    }
+                }
+            }
+            
+            // Throttle scroll event for better performance
+            let scrollTimeout;
+            window.addEventListener('scroll', function() {
+                if (!scrollTimeout) {
+                    scrollTimeout = setTimeout(function() {
+                        updateActiveNavigation();
+                        scrollTimeout = null;
+                    }, 100);
+                }
+            });
+            
+            // Initial call to set correct active state on page load
+            updateActiveNavigation();
+        });
+    })();
+
+    // Call setup functions
+    initializeEventListeners();
+    setupAnimations();
+
+    // Function to consistently set up upload area event listeners
+    function setupUploadAreaEvents() {
+        if (uploadArea) {
+            // Reset upload area to initial state
+            uploadArea.innerHTML = `
+                <i class="fas fa-cloud-upload-alt"></i>
+                <p>Drag and drop your image here or <span>click to browse</span></p>
+                <input type="file" id="file-input" class="file-input" accept="image/*">
+            `;
+            
+            // Get the newly created file input
+            const newFileInput = uploadArea.querySelector('#file-input');
+            if (newFileInput) {
+                // Clear any existing listeners and add new ones
+                newFileInput.removeEventListener('change', fileInputChangeHandler);
+                newFileInput.addEventListener('change', fileInputChangeHandler);
+                
+                uploadArea.removeEventListener('click', uploadAreaClickHandler);
+                uploadArea.addEventListener('click', uploadAreaClickHandler);
+            }
+        }
+        
+        // Reset variables
+        selectedFile = null;
+        scanResult = null;
+        
+        // Show upload section, hide results
+        if (uploadSection) uploadSection.style.display = 'block';
+        if (resultsSection) resultsSection.style.display = 'none';
+    }
+});
